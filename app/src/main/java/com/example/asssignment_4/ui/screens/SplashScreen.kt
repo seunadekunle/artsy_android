@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavHostController
+import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.delay
-import androidx.compose.runtime.LaunchedEffect
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.example.asssignment_4.ui.navigation.Screen
 
 @Composable
@@ -29,4 +31,10 @@ fun SplashScreen(navController: NavHostController) {
             style = MaterialTheme.typography.headlineLarge
         )
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SplashScreenPreview() {
+    SplashScreen(navController = rememberNavController())
 }

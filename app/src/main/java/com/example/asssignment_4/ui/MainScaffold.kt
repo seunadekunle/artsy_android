@@ -8,8 +8,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.asssignment_4.ui.navigation.AppNavGraph
 import com.example.asssignment_4.ui.navigation.Screen
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun MainScaffold(navController: NavHostController, isDarkTheme: Boolean, onToggleTheme: () -> Unit) {
     Scaffold(
         topBar = {
@@ -18,7 +23,7 @@ fun MainScaffold(navController: NavHostController, isDarkTheme: Boolean, onToggl
                 actions = {
                     IconButton(onClick = onToggleTheme) {
                         Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            imageVector = if (isDarkTheme) Icons.Filled.LightMode else Icons.Filled.DarkMode,
                             contentDescription = "Toggle Theme"
                         )
                     }

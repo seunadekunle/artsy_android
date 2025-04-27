@@ -1,9 +1,11 @@
 package com.example.asssignment_4.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavHostController
+import androidx.navigation.NavOptionsBuilder
 import com.example.asssignment_4.ui.screens.*
 
 sealed class Screen(val route: String) {
@@ -30,14 +32,20 @@ fun AppNavGraph(navController: NavHostController) {
             LoginScreen(
                 navController = navController,
                 onRegister = { navController.navigate(Screen.Register.route) },
-                onLoginSuccess = { navController.navigate(Screen.Home.route) { popUpTo(Screen.Login.route) { inclusive = true } } }
+                onLoginSuccess = { navController.navigate(Screen.Home.route) { 
+                // Clear the back stack up to Login screen
+                popUpTo(Screen.Login.route) { inclusive = true } 
+            } }
             )
         }
         composable(Screen.Register.route) {
             RegisterScreen(
                 navController = navController,
                 onLogin = { navController.navigate(Screen.Login.route) },
-                onRegisterSuccess = { navController.navigate(Screen.Home.route) { popUpTo(Screen.Register.route) { inclusive = true } } }
+                onRegisterSuccess = { navController.navigate(Screen.Home.route) { 
+                // Clear the back stack up to Register screen
+                popUpTo(Screen.Register.route) { inclusive = true } 
+            } }
             )
         }
         composable(Screen.Favourites.route) { FavouritesScreen(navController) }

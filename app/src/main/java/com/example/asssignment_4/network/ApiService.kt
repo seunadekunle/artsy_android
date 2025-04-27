@@ -15,6 +15,9 @@ interface ApiService {
     @GET("/api/auth/me")
     suspend fun getProfile(): Response<User>
 
+    @POST("/api/auth/logout")
+    suspend fun logout(): Response<Unit>
+
     // Search
     @GET("/api/search")
     suspend fun searchArtists(@Query("q") query: String): Response<List<Artist>>

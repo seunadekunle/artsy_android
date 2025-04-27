@@ -9,9 +9,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 
 @Composable
 fun RegisterScreen(
@@ -61,7 +63,7 @@ fun RegisterScreen(
         ) {
             Text(
                 text = "Register",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
@@ -79,8 +81,8 @@ fun RegisterScreen(
             if (nameError != null) {
                 Text(
                     text = nameError!!,
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -99,8 +101,8 @@ fun RegisterScreen(
             if (emailError != null) {
                 Text(
                     text = emailError!!,
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -119,8 +121,8 @@ fun RegisterScreen(
             if (passwordError != null) {
                 Text(
                     text = passwordError!!,
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -129,9 +131,8 @@ fun RegisterScreen(
                 onClick = {
                     if (validate()) {
                         isLoading = true
-                        // Simulate register delay
-                        LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(1200)
+                        // Simulate register delay using Handler instead of LaunchedEffect
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                             isLoading = false
                             if (email == "elon@gmail.com") {
                                 errorMessage = "Email already exists"
@@ -141,7 +142,7 @@ fun RegisterScreen(
                                 errorMessage = null
                                 onRegisterSuccess()
                             }
-                        }
+                        }, 1200)
                     }
                 },
                 enabled = !isLoading,
@@ -149,7 +150,10 @@ fun RegisterScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF223C6A))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF223C6A),
+                    contentColor = Color.White
+                )
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
@@ -172,7 +176,7 @@ fun RegisterScreen(
                 Text(
                     text = errorMessage!!,
                     color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -191,4 +195,14 @@ fun RegisterScreen(
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RegisterScreenPreview() {
+    RegisterScreen(
+        navController = rememberNavController(),
+        onLogin = {},
+        onRegisterSuccess = {}
+    )
 }
