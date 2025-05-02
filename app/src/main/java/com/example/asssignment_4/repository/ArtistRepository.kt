@@ -1,14 +1,12 @@
 package com.example.asssignment_4.repository
 
-import com.example.asssignment_4.model.Artist
-import com.example.asssignment_4.model.User
-import com.example.asssignment_4.model.Artwork
-import com.example.asssignment_4.model.Gene
+import com.example.asssignment_4.model.*
 import com.example.asssignment_4.network.ApiService
 import com.example.asssignment_4.network.FavouriteRequest
+import retrofit2.Response
 
 class ArtistRepository(private val api: ApiService) {
-    suspend fun searchArtists(query: String) = api.searchArtists(query)
+    suspend fun searchArtists(query: String): Response<SearchResponse> = api.searchArtists(query)
     suspend fun getArtistDetails(id: String) = api.getArtistDetails(id)
     suspend fun getFavourites() = api.getFavourites()
     suspend fun addFavourite(artistId: String) = api.addFavourite(FavouriteRequest(artistId))

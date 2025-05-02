@@ -11,6 +11,7 @@ import com.example.asssignment_4.ui.screens.*
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Home : Screen("home")
+    object Search : Screen("search")
     object ArtistDetail : Screen("artistDetail/{artistId}") {
         fun createRoute(artistId: String) = "artistDetail/$artistId"
     }
@@ -49,5 +50,6 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
         composable(Screen.Favourites.route) { FavouritesScreen(navController) }
+        composable(Screen.Search.route) { SearchScreen(navController) }
     }
 }

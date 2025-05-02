@@ -16,10 +16,10 @@ import androidx.core.view.WindowCompat
 
 // Define light colors
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF6200EE),
-    secondary = Color(0xFF03DAC5),
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = artsyBlue,
+    secondary = artsyLightBlue,
+    background = artsyLightBlue,
+    surface = artsyLightBlue,
     onPrimary = Color.White,
     onSecondary = Color.Black,
     onBackground = Color(0xFF1C1B1F),

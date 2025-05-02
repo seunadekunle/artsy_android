@@ -1,39 +1,38 @@
 package com.example.asssignment_4.ui.screens
 
-import androidx.compose.foundation.Image
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.example.asssignment_4.ui.navigation.Screen
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.ui.navigation.Screen
+import com.example.asssignment_4.ui.theme.artsyBlue
+import com.example.asssignment_4.ui.theme.artsyDarkBlue
+import com.example.asssignment_4.ui.theme.artsyLightBlue
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
 
@@ -54,116 +53,77 @@ fun HomeScreen(
     val currentUser by authViewModel.currentUser.collectAsState()
     val authError by authViewModel.authError.collectAsState()
 
-    var showMenu by remember { mutableStateOf(false) }
     val isLoggedIn = currentUser != null
     val focusManager = LocalFocusManager.current
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Artist Search") },
-                actions = {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Filled.AccountCircle, contentDescription = "Avatar")
-                        }
-                        if (isLoggedIn) {
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
-                            ) {
-                                DropdownMenuItem(text = { Text("Log out") }, onClick = {
-                                    authViewModel.logoutUser()
-                                    showMenu = false
-                                })
-                                DropdownMenuItem(text = { Text("Delete account") }, onClick = { showMenu = false })
-                            }
-                        }
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        // Date
+        Text(
+            text = "31 March 2025",
+            style = MaterialTheme.typography.titleSmall,
+            color = Color.Gray,
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+        )
+
         Column(
             modifier = Modifier
-                .padding(paddingValues)
-                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
-            // Date
-            Text(
-                text = LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Search input field
-            SearchField(
-                value = searchTerm,
-                onValueChange = { homeViewModel.setSearchTerm(it) }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (isLoading) {
-                LoadingIndicator()
-            } else if (error != null) {
-                ErrorMessage(message = error ?: "Unknown error")
-            }
-
-            authError?.let {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF0F0F6))
+            ) {
                 Text(
-                    text = "Auth Error: $it",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    text = "Favorites",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Black,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+            // Login button
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(
+                    onClick = { },
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = artsyDarkBlue
+                    )
+                ) {
+                    Text(
+                        "Log in to see favorites",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                }
+            }
+            // Powered by Artsy attribution
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Powered by Artsy",
+                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                    color = Color.Gray,
+                    modifier = Modifier
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://artsy.org"))
+                            navController.context.startActivity(intent)
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center
                 )
             }
 
-            if (searchTerm.length < 3 && !isLoading) {
-                if (isLoggedIn) {
-                    Text(
-                        text = "Favorites",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Card(
-                        modifier = Modifier
-                            .padding(vertical = 4.dp)
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-                                items(favourites.size) { index ->
-                                    val favArtist = favourites[index]
-                                    Text(favArtist.name ?: "Unknown Favourite", modifier = Modifier.padding(8.dp))
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Text("Login to see your favourites", modifier = Modifier.align(Alignment.CenterHorizontally))
-                }
-            } else if (!isLoading) {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(searchResults.size) { index ->
-                        val artist = searchResults[index]
-                        ArtistCard(
-                            artist = artist,
-                            artistInfo = formatArtistInfo(artist),
-                            isFav = favouriteIds.contains(artist.id),
-                            onFavToggle = { homeViewModel.toggleFavourite(artist) },
-                            onClick = {
-                                focusManager.clearFocus()
-                                navController.navigate(Screen.ArtistDetail.createRoute(artist.id ?: "unknown"))
-                            }
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -182,7 +142,15 @@ fun formatArtistInfo(artist: Artist): String {
 @Preview(showBackground = true)
 @Composable
 fun ArtistCard(
-    artist: Artist = Artist(id = "123", name = "Pablo Picasso", nationality = "Spanish", birthday = "1881", deathday = "1973", imageUrl = "", biography = "Pablo Picasso was a Spanish painter, sculptor, printmaker, ceramicist and theatre designer."),
+    artist: Artist = Artist(
+        id = "123",
+        name = "Pablo Picasso",
+        nationality = "Spanish",
+        birthday = "1881",
+        deathday = "1973",
+        imageUrl = "",
+        biography = "Pablo Picasso was a Spanish painter, sculptor, printmaker, ceramicist and theatre designer."
+    ),
     artistInfo: String = "Spanish, (1881 - 1973)",
     isFav: Boolean = false,
     onFavToggle: () -> Unit = {},
@@ -210,7 +178,7 @@ fun ArtistCard(
             )
             Spacer(Modifier.width(14.dp))
             Column {
-                Text(artist.name ?: "Unknown Artist", style = MaterialTheme.typography.bodyLarge)
+                Text(artist.name, style = MaterialTheme.typography.bodyLarge)
                 Text(artistInfo, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
             Spacer(Modifier.weight(1f))
@@ -232,63 +200,82 @@ fun ArtistCard(
 fun HomeScreenPreview() {
     // Create a simplified version of the HomeScreen UI for preview
     val navController = rememberNavController()
-    
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Artist Search") },
-                actions = {
-                    Box {
-                        IconButton(onClick = { }) {
-                            Icon(Icons.Filled.AccountCircle, contentDescription = "Avatar")
-                        }
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        // Date
+        Text(
+            text = "31 March 2025",
+            style = MaterialTheme.typography.titleSmall,
+            color = Color.Gray,
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+        )
+
         Column(
             modifier = Modifier
-                .padding(paddingValues)
-                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
-            // Date
-            Text(
-                text = LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp)
-            )
-            
-            // Search field
-            SearchField(value = "", onValueChange = {})
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Sample artist cards
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(3) { index ->
-                    val artist = Artist(
-                        id = "artist$index",
-                        name = "Sample Artist $index",
-                        nationality = "Country",
-                        birthday = "1980",
-                        deathday = null,
-                        imageUrl = "",
-                        biography = "Sample biography"
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF0F0F6))
+            ) {
+                Text(
+                    text = "Favorites",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.Black,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+            // Login button
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Button(
+                    onClick = { },
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = artsyDarkBlue
                     )
-                    ArtistCard(
-                        artist = artist,
-                        artistInfo = formatArtistInfo(artist),
-                        isFav = index % 2 == 0,
-                        onFavToggle = { },
-                        onClick = { }
+                ) {
+                    Text(
+                        "Log in to see favorites",
+                        style = MaterialTheme.typography.titleSmall
                     )
                 }
             }
+            // Powered by Artsy attribution
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Powered by Artsy",
+                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                    color = Color.Gray,
+                    modifier = Modifier
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://artsy.org"))
+                            navController.context.startActivity(intent)
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
+
         }
+
     }
+
+
 }
+
 
 @Preview(showBackground = true)
 @Composable
@@ -308,7 +295,12 @@ fun SearchField(
 @Preview(showBackground = true)
 @Composable
 fun LoadingIndicator() {
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
         CircularProgressIndicator()
     }
 }
@@ -319,7 +311,9 @@ fun ErrorMessage(message: String = "An error occurred") {
     Text(
         text = message,
         color = MaterialTheme.colorScheme.error,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
         textAlign = TextAlign.Center
     )
 }

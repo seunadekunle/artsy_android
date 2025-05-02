@@ -19,8 +19,8 @@ interface ApiService {
     suspend fun logout(): Response<Unit>
 
     // Search
-    @GET("/api/search")
-    suspend fun searchArtists(@Query("q") query: String): Response<List<Artist>>
+    @GET("/api/artists/search")
+    suspend fun searchArtists(@Query("q") query: String): Response<SearchResponse>
 
     // Artist details
     @GET("/api/artist/{id}")

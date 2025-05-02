@@ -3,13 +3,16 @@ package com.example.asssignment_4.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.model.SearchResponse
 import com.example.asssignment_4.repository.ArtistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.* // Import necessary Flow operators
+import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.IOException // Import IOException
+import java.io.IOException
 
 // Assuming Hilt setup for dependency injection
 // If not using Hilt, adjust constructor injection accordingly
@@ -48,44 +51,54 @@ class HomeViewModel @Inject constructor(
              _isLoading.value = false // Stop loading indicator
              return // Don't trigger search yet
         }
+
+        viewModelScope.launch {
+            try {
+                // Call API and update results
+                _isLoading.value = true
+                try {
+                    val response = artistRepository.searchArtists(term)
+                    if (response.isSuccessful) {
+                        val searchResponse = response.body()
+                        if (searchResponse != null) {
+                            // Convert SearchResult to Artist objects
+                            _searchResults.value = searchResponse._embedded.results.map { result ->
+                                Artist(
+                                    id = result.links.self.href.split("/").last(),
+                                    name = result.title,
+                                    imageUrl = result.links.thumbnail.href,
+                                    nationality = null,
+                                    birthday = null,
+                                    deathday = null,
+                                    biography = result.description
+                                )
+                            }
+                        } else {
+                            _searchResults.value = emptyList()
+                        }
+                    } else {
+                        _error.value = "Failed to search artists"
+                    }
+                } catch (e: Exception) {
+                    _error.value = e.message ?: "An error occurred"
+                } finally {
+                    _isLoading.value = false
+                }
+            } catch (e: Exception) {
+                _error.value = e.message ?: "An error occurred"
+            }
+        }
+    }
+
+    fun setError(message: String) {
+        _error.value = message
+        _searchResults.value = emptyList()
+        _isLoading.value = false
     }
 
     init {
-        // Collect debounced search term changes to trigger API call
-        loadFavourites() // Load initial favourites
-        viewModelScope.launch {
-            @OptIn(FlowPreview::class)
-            _searchTerm
-                .debounce(500L) // Wait 500ms after last input
-                .filter { it.length >= 3 } // Only search if term is 3+ chars
-                .distinctUntilChanged() // Only search if term actually changed
-                .onEach { _isLoading.value = true } // Show loading indicator
-                .mapLatest { term -> // Use mapLatest to cancel previous searches if new term arrives
-                    try {
-                        val response = artistRepository.searchArtists(term)
-                        if (response.isSuccessful) {
-                             Result.success(response.body() ?: emptyList())
-                        } else {
-                            Result.failure(IOException("API Error: ${response.code()} ${response.message()}"))
-                        }
-                    } catch (e: Exception) {
-                        Result.failure(e)
-                    }
-                }
-                .collect { result ->
-                    _isLoading.value = false // Hide loading indicator
-                    result.onSuccess { artists ->
-                        _searchResults.value = artists
-                        _error.value = null // Clear any previous error
-                         if (artists.isEmpty()) {
-                             _error.value = "No artists found for \"${_searchTerm.value}\""
-                         }
-                    }.onFailure { exception ->
-                        _searchResults.value = emptyList() // Clear results on error
-                        _error.value = "Search failed: ${exception.message ?: "Unknown error"}"
-                    }
-                }
-        }
+        // Load initial favourites
+        loadFavourites()
     }
 
     private fun loadFavourites() {
