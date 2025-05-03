@@ -154,16 +154,21 @@ fun MainScaffold(
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(modifier = Modifier.padding(16.dp))
                             }
-                        } else if (error != null) {
-                            Text(
-                                text = error ?: "Unknown error",
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        } else if (searchResults.isNotEmpty()) {
+                        }
+//                        else if (error != null) {
+//                            Text(
+//                                text = error ?: "Unknown error",
+//                                color = MaterialTheme.colorScheme.error,
+//                                modifier = Modifier.padding(16.dp)
+//                            )
+//                        }
+                        else if (searchResults.isNotEmpty()) {
                             LazyColumn(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 16.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(searchResults) { artist ->
                                     SearchResultCard(

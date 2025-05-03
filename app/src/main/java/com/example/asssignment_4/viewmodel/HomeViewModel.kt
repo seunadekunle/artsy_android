@@ -14,8 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.IOException
 
-// Assuming Hilt setup for dependency injection
-// If not using Hilt, adjust constructor injection accordingly
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(

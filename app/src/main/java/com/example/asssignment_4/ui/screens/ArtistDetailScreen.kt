@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.draw.clip
@@ -30,37 +31,36 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
-import coil.compose.rememberAsyncImagePainter
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.navigation.compose.rememberNavController
+import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.rememberAsyncImagePainter
+import androidx.compose.material.icons.filled.ArrowBack
+import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.viewmodel.HomeViewModel
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun ArtistDetailScreen(navController: NavHostController, artistId: String) {
-    // Mock loading state
-    var isLoading by remember { mutableStateOf(false) }
+fun ArtistDetailScreen(
+    navController: NavHostController,
+    artistId: String,
+    viewModel: HomeViewModel = hiltViewModel()
+) {
     var selectedTab by remember { mutableStateOf(0) }
-    var fav by remember { mutableStateOf(false) }
-    var showCategoryDialog by remember { mutableStateOf(false) }
 
-    // Mock artist data
-    val artistName = "Pablo Picasso"
-    val artistSubtitle = "Spanish, 1881 - 1973"
-    val artistBio = "Born in Málaga, Spain, in 1881, Pablo Picasso showed an early passion for drawing... (truncated)"
-    val artworkUrl = "https://www.artic.edu/iiif/2/9e3c6d7e-2d2f-3b0a-4b6c-7e3e5d2c1b4a/full/843,/0/default.jpg"
-    val artworkTitle = "View of Vétheuil, 1880"
-    val similarArtists = listOf(
-        "Georges Braque" to "https://example.com/braque.jpg",
-        "Juan Gris" to "https://example.com/gris.jpg",
-        "Francisco Bores" to "https://example.com/bores.jpg"
-    )
+    LaunchedEffect(artistId) {
+        println("Fetching details for artist ID: $artistId") // Placeholder
+    }
+
+    val isLoading = false // Replace with viewModel.isLoading.collectAsState()
+    val error = null // Replace with viewModel.error.collectAsState()
+    val artist: Artist? = null // Replace with actual artist data from state
+    val artistName = artist?.name ?: "Artist Name" // Placeholder
+    val artistSubtitle = "${artist?.nationality ?: "Nationality"}, ${artist?.birthday ?: "Dates"}" // Placeholder
+    val artistBio = artist?.biography ?: "Biography loading..." // Placeholder
 
     Scaffold(
         topBar = {
@@ -70,21 +70,12 @@ fun ArtistDetailScreen(navController: NavHostController, artistId: String) {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { fav = !fav }) {
-                        Icon(
-                            imageVector = if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                            contentDescription = "Favorite",
-                            tint = if (fav) Color(0xFFFFC107) else Color.Gray
-                        )
-                    }
                 }
             )
         }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            val tabTitles = listOf("Details", "Artworks", "Similar")
+            val tabTitles = listOf("Details", "Artworks")
             TabRow(selectedTabIndex = selectedTab) {
                 tabTitles.forEachIndexed { idx, title ->
                     Tab(
@@ -94,33 +85,49 @@ fun ArtistDetailScreen(navController: NavHostController, artistId: String) {
                     )
                 }
             }
-            when {
-                isLoading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                        Text("Loading...", modifier = Modifier.padding(top = 16.dp))
-                    }
+
+            if (isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-                selectedTab == 0 -> {
-                    // Details Tab
-                    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                        item {
-                            Text(artistName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Text(artistSubtitle, style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
+            } else if (error != null) {
+                Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                    Text("Error: $error", color = MaterialTheme.colorScheme.error)
+                }
+            } else {
+                when (selectedTab) {
+                    0 -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = artistName,
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = artistSubtitle,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(Modifier.height(16.dp))
                             Text(
                                 text = artistBio,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(bottom = 16.dp)
+                                style = MaterialTheme.typography.bodyLarge
                             )
                         }
                     }
-                }
-                selectedTab == 1 -> {
-                    // Artworks Tab
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+
+                    1 -> {
+                        var showCategoryDialog by remember { mutableStateOf(false) }
+                        val artworkUrl = "https://www.artic.edu/iiif/2/9e3c6d7e-2d2f-3b0a-4b6c-7e3e5d2c1b4a/full/843,/0/default.jpg" // Placeholder
+                        val artworkTitle = "Artwork Title" // Placeholder
+
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth().padding(16.dp)
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
                         ) {
                             Image(
                                 painter = rememberAsyncImagePainter(artworkUrl),
@@ -146,48 +153,9 @@ fun ArtistDetailScreen(navController: NavHostController, artistId: String) {
                                         Text("Close")
                                     }
                                 },
-                                title = {
-                                    Text("Categories")
-                                },
-                                text = {
-                                    Column {
-                                        Text("1860–1969")
-                                        Text("All art, design, decorative art, and architecture created from roughly 1860 to 1969.")
-                                    }
-                                }
+                                title = { Text("Categories") },
+                                text = { Text("Placeholder categories...") } // Placeholder text
                             )
-                        }
-                    }
-                }
-                selectedTab == 2 -> {
-                    // Similar Tab
-                    if (similarArtists.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No similar artists found.")
-                        }
-                    } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                            items(similarArtists.size) { idx ->
-                                val (name, imgUrl) = similarArtists[idx]
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFFF5F5F5))
-                                        .clickable { /* Navigate to artist detail */ }
-                                ) {
-                                    Image(
-                                        painter = painterResource(android.R.drawable.ic_menu_gallery), // Replace with Coil in real app
-                                        contentDescription = name,
-                                        modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    Text(name, style = MaterialTheme.typography.bodyLarge)
-                                }
-                            }
                         }
                     }
                 }

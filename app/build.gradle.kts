@@ -109,6 +109,7 @@ dependencies {
     // Standard Java libraries come with SDK
     // For CookieManager and CookiePolicy
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation("androidx.core:core-splashscreen:1.0.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
