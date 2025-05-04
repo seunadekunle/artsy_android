@@ -6,8 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Person
@@ -16,7 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -30,6 +33,13 @@ import com.example.asssignment_4.ui.theme.artsyBlue
 import com.example.asssignment_4.ui.theme.artsyLightBlue
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.TextDecoration
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,7 +56,20 @@ fun MainScaffold(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val isSearchScreen = currentRoute == Screen.Search.route
+    val isLoginScreen = currentRoute == Screen.Login.route
+    val isSignupScreen = currentRoute == Screen.Register.route
     val homeViewModel: HomeViewModel = hiltViewModel()
+
+    // Check if the current route is the ArtistDetail screen
+    // Note: Comparing against the route *template* from Screen.ArtistDetail.route
+    val isDetailScreen = currentRoute == Screen.ArtistDetail.route 
+    val detailArtistName = if (isDetailScreen) {
+        // Extract artist name from arguments
+        navBackStackEntry?.arguments?.getString("artistName")?.replace("%20", " ") ?: "Artist Detail"
+    } else {
+        null
+    }
+
     var searchTerm by remember { mutableStateOf("") }
 
     // Observe search results
@@ -69,79 +92,175 @@ fun MainScaffold(
 
     Scaffold(
         topBar = {
-            if (isSearchScreen) {
-                TopAppBar(
-                    title = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Filled.Search,
-                                contentDescription = "Search",
-                                modifier = Modifier.padding(end = 8.dp),
-                                tint = Color.Gray
-                            )
-                            TextField(
-                                value = searchTerm,
-                                onValueChange = { searchTerm = it },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("Search for artists...") },
-                                singleLine = true,
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
-                                )
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { navController.navigateUp() }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Close")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = artsyBlue,
-                    )
-                )
-            } else {
-                TopAppBar(
-                    modifier = Modifier.background(artsyLightBlue),
-                    title = { Text("Artist Search") },
-                    actions = {
-                        IconButton(onClick = { navController.navigate(Screen.Search.route) }) {
-                            Icon(Icons.Filled.Search, contentDescription = "Search")
-                        }
-                        Box {
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Outlined.Person, contentDescription = "Account")
-                            }
-                            if (isLoggedIn) {
-                                DropdownMenu(
-                                    expanded = showMenu,
-                                    onDismissRequest = { showMenu = false }
+            // Conditionally display TopAppBar based on route
+            when {
+                isSearchScreen -> {
+                    // Search TopAppBar (existing logic)
+                    TopAppBar(
+                        title = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Log out") },
-                                        onClick = {
-                                            authViewModel.logoutUser()
-                                            showMenu = false
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search",
+                                        tint = LocalContentColor.current.copy(alpha = 0.75f)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        BasicTextField(
+                                            value = searchTerm,
+                                            onValueChange = {
+                                                searchTerm = it
+                                                if (it.isNotEmpty()) {
+                                                    homeViewModel.setSearchTerm(it)
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 6.dp),
+                                            singleLine = true,
+                                            textStyle = LocalTextStyle.current.copy(
+                                                fontSize = 22.sp,
+                                                fontWeight = FontWeight.W500,
+                                                textDecoration = TextDecoration.Underline,
+                                                color = LocalContentColor.current
+                                            ),
+                                            cursorBrush = SolidColor(LocalContentColor.current)
+                                        )
+                                        if (searchTerm.isEmpty()) {
+                                            Text(
+                                                text = "Search artists…",
+                                                fontSize = 22.sp,
+                                                color = LocalContentColor.current.copy(alpha = 0.6f),
+                                                modifier = Modifier.padding(start = 6.dp)
+                                            )
                                         }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Delete account") },
-                                        onClick = { showMenu = false }
-                                    )
+                                    }
+
+                                    IconButton(onClick = {
+                                        homeViewModel.setSearchTerm("")
+                                        searchTerm = ""
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            tint = LocalContentColor.current.copy(alpha = 1f)
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = artsyBlue,
+
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = artsyBlue,
+                        )
                     )
-                )
+                }
+                isDetailScreen && detailArtistName != null -> {
+                    // Artist Detail TopAppBar
+                    TopAppBar(
+                        title = { Text(detailArtistName) }, // Use extracted name
+                        navigationIcon = {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = artsyBlue, // Keep consistent color
+                        )
+                    )
+                }
+                      currentRoute == Screen.Home.route -> {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                "Artist Search",
+                                style = MaterialTheme.typography.titleLarge
+                                    .copy(fontWeight = FontWeight.Medium)
+                            ) },
+
+                        actions = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Add Search Icon Button HERE
+                                IconButton(onClick = { navController.navigate(Screen.Search.route)}) {
+                                    Icon(Icons.Filled.Search, contentDescription = "Search")
+                                }
+                                // Profile Icon/Menu Button (existing)
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(
+                                        imageVector = if (isLoggedIn) Icons.Filled.Person else Icons.Outlined.Person,
+                                        contentDescription = "Profile"
+                                    )
+                                }
+                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    if (isLoggedIn) {
+                                        DropdownMenuItem(text = { Text("Favorites") }, onClick = { 
+                                            navController.navigate(Screen.Favourites.route)
+                                            showMenu = false
+                                         })
+                                        DropdownMenuItem(text = { Text("Logout") }, onClick = { authViewModel.logoutUser() ; showMenu = false })
+                                    } else {
+                                        DropdownMenuItem(text = { Text("Login") }, onClick = { navController.navigate(Screen.Login.route); showMenu = false })
+                                        DropdownMenuItem(text = { Text("Register") }, onClick = { navController.navigate(Screen.Register.route) ; showMenu = false })
+                                    }
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = artsyBlue,
+                        )
+                    )
+                }
+                else -> {
+                    // Default TopAppBar (for Home, Login, etc.)
+                    TopAppBar(
+                        title = { Text("Artsy App") },
+                        actions = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(checked = isDarkTheme, onCheckedChange = { onToggleTheme() })
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(
+                                        imageVector = if (isLoggedIn) Icons.Filled.Person else Icons.Outlined.Person,
+                                        contentDescription = "Profile"
+                                    )
+                                }
+                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    if (isLoggedIn) {
+                                        DropdownMenuItem(text = { Text("Favorites") }, onClick = { 
+                                            navController.navigate(Screen.Favourites.route)
+                                            showMenu = false
+                                         })
+                                        DropdownMenuItem(text = { Text("Logout") }, onClick = { authViewModel.logoutUser() ; showMenu = false })
+                                    } else {
+                                        DropdownMenuItem(text = { Text("Login") }, onClick = { navController.navigate(Screen.Login.route); showMenu = false })
+                                        DropdownMenuItem(text = { Text("Register") }, onClick = { navController.navigate(Screen.Register.route) ; showMenu = false })
+                                    }
+                                }
+                            }
+                        },
+                        navigationIcon = {
+                            if (currentRoute != Screen.Home.route) { // Show back arrow if not on Home
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                                }
+                            } else {
+                                IconButton(onClick = { navController.navigate(Screen.Search.route)}) {
+                                    Icon(Icons.Filled.Search, contentDescription = "Search")
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = artsyBlue,
+                        )
+                    )
+                }
             }
         },
         containerColor = artsyLightBlue,
@@ -149,19 +268,11 @@ fun MainScaffold(
             Box(modifier = Modifier.padding(innerPadding)) {
                 if (isSearchScreen) {
                     Column {
-                        // Search results
                         if (isLoading) {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(modifier = Modifier.padding(16.dp))
                             }
                         }
-//                        else if (error != null) {
-//                            Text(
-//                                text = error ?: "Unknown error",
-//                                color = MaterialTheme.colorScheme.error,
-//                                modifier = Modifier.padding(16.dp)
-//                            )
-//                        }
                         else if (searchResults.isNotEmpty()) {
                             LazyColumn(
                                 modifier = Modifier
@@ -183,14 +294,14 @@ fun MainScaffold(
                             }
                         } else if (searchTerm.isNotBlank()) {
                             Text(
-                                text = "No results found for '$searchTerm'",
+                                text = "",
                                 color = Color.Gray,
                                 modifier = Modifier.padding(16.dp)
                             )
                         }
                     }
                 } else {
-                    AppNavGraph(navController = navController)
+                    AppNavGraph(navController = navController, paddingValues = innerPadding)
                 }
             }
         }

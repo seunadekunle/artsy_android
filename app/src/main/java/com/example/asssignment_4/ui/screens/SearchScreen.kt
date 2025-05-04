@@ -60,6 +60,25 @@ fun SearchScreen(
             focusRequester.requestFocus()
         }
     }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(searchResults) { artist ->
+            SearchResultCard(
+                artist = artist,
+                onClick = {
+                    navController.navigate(
+                        Screen.ArtistDetail.createRoute(artist.id)
+                    )
+                }
+            )
+        }
+    }
 }
 
 @Composable
@@ -78,7 +97,7 @@ fun SearchResultCard(
         tonalElevation = 2.dp
     ) {
         // we'll fix the height to something banner‑ish
-        Box(modifier = Modifier.height(190.dp)) {
+        Box(modifier = Modifier.height(195.dp)) {
             // 1) full‑size background image
             if (artist.imageUrl == "/assets/shared/missing_image.png") {
                 AsyncImage(

@@ -1,19 +1,25 @@
 package com.example.asssignment_4.ui.navigation
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel 
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.asssignment_4.ui.screens.*
+import com.example.asssignment_4.viewmodel.LoginViewModel
 
 // Define the navigation routes
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Search : Screen("search")
-    object ArtistDetail : Screen("artist_detail") {
-        // Helper function to create the route with arguments
-        fun createRoute(artistId: String) = "artist_detail/$artistId"
+    object ArtistDetail : Screen("artist_detail/{artistId}") {
+        fun createRoute(artistId: String): String {
+            return "artist_detail/$artistId"
+        }
     }
     object Login : Screen("login")
     object Register : Screen("register")
@@ -24,7 +30,8 @@ sealed class Screen(val route: String) {
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun AppNavGraph(
-    navController: NavHostController
+    navController: NavHostController,
+    paddingValues: PaddingValues
 ) {
     NavHost(
         navController = navController,
@@ -67,8 +74,11 @@ fun AppNavGraph(
         }
 
         composable(
-            route = Screen.ArtistDetail.route + "/{artistId}",
-            enterTransition = {
+            route = Screen.ArtistDetail.route,
+            arguments = listOf(
+                navArgument("artistId") { type = NavType.StringType }
+            ),
+            enterTransition = { 
                 slideInHorizontally(initialOffsetX = { it }) + fadeIn()
             },
             exitTransition = {
@@ -81,16 +91,14 @@ fun AppNavGraph(
                 slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
             }
         ) { backStackEntry ->
-            val artistId = backStackEntry.arguments?.getString("artistId")
-            if (artistId != null) {
-                ArtistDetailScreen(
-                    navController = navController,
-                    artistId = artistId
-                )
-            }
+            val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
+            ArtistDetailScreen(
+                navController = navController,
+                artistId = artistId,
+                paddingValues = paddingValues
+            )
         }
 
-        // Add Login Screen route
         composable(
             route = Screen.Login.route,
             enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
@@ -109,7 +117,6 @@ fun AppNavGraph(
             )
         }
 
-        // Add Register Screen route
         composable(
             route = Screen.Register.route,
             enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
@@ -128,7 +135,6 @@ fun AppNavGraph(
             )
         }
 
-        // Add Favourites Screen route
         composable(
             route = Screen.Favourites.route,
             enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },

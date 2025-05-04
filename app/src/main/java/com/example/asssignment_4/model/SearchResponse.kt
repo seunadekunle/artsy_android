@@ -27,6 +27,4 @@ data class SearchLinks(
     val thumbnail: Link
 )
 
-data class Link(
-    val href: String
-)
+// Link class moved to dedicated Link.kt file

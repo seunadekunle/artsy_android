@@ -11,6 +11,12 @@ class ArtistRepository(private val api: ApiService) {
     suspend fun getFavourites() = api.getFavourites()
     suspend fun addFavourite(artistId: String) = api.addFavourite(FavouriteRequest(artistId))
     suspend fun removeFavourite(artistId: String) = api.removeFavourite(FavouriteRequest(artistId))
+
+    // Add function to get artist details by ID (using new endpoint)
+    suspend fun getArtistDetailsById(artistId: String): Artist = api.getArtistDetailsById(artistId)
+
+    // Add function to get artist artworks by ID (using new endpoint)
+    suspend fun getArtistArtworks(artistId: String): List<Artwork> = api.getArtistArtworks(artistId)
 }
 
 class AuthRepository(private val api: ApiService) {

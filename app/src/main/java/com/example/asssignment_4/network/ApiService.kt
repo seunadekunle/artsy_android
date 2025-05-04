@@ -26,6 +26,12 @@ interface ApiService {
     @GET("/api/artist/{id}")
     suspend fun getArtistDetails(@Path("id") id: String): Response<Artist>
 
+    @GET("/api/artists/{id}")
+    suspend fun getArtistDetailsById(@Path("id") artistId: String): Artist
+
+    @GET("/api/artists/{id}/artworks")
+    suspend fun getArtistArtworks(@Path("id") artistId: String): List<Artwork>
+
     // Favourites
     @GET("/api/favourites")
     suspend fun getFavourites(): Response<List<Artist>>

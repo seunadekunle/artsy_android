@@ -3,6 +3,9 @@ package com.example.asssignment_4.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.model.ArtistLinks
+import com.example.asssignment_4.model.Artwork
+import com.example.asssignment_4.model.Link
 import com.example.asssignment_4.model.SearchResponse
 import com.example.asssignment_4.repository.ArtistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,6 +41,20 @@ class HomeViewModel @Inject constructor(
     private val _favouriteIds = MutableStateFlow<Set<String>>(emptySet())
     val favouriteIds: StateFlow<Set<String>> = _favouriteIds.asStateFlow()
 
+    // --- Artist Detail and Artworks State ---
+    private val _artistDetail = MutableStateFlow<Artist?>(null)
+    val artistDetail: StateFlow<Artist?> = _artistDetail.asStateFlow()
+
+    private val _artistArtworks = MutableStateFlow<List<Artwork>>(emptyList())
+    val artistArtworks: StateFlow<List<Artwork>> = _artistArtworks.asStateFlow()
+
+    private val _isDetailLoading = MutableStateFlow(false)
+    val isDetailLoading: StateFlow<Boolean> = _isDetailLoading.asStateFlow()
+
+    private val _detailError = MutableStateFlow<String?>(null)
+    val detailError: StateFlow<String?> = _detailError.asStateFlow()
+    // ----------------------------------------
+
     // Debounce search term changes
     @OptIn(FlowPreview::class)
     fun setSearchTerm(term: String) {
@@ -61,14 +78,30 @@ class HomeViewModel @Inject constructor(
                         if (searchResponse != null) {
                             // Convert SearchResult to Artist objects
                             _searchResults.value = searchResponse._embedded.results.map { result ->
+                                val artistId = result.links.self.href.split("/").last()
+                                val imageUrl = if (result.links.thumbnail.href == "/assets/shared/missing_image.png") {
+                                    null // Use a default placeholder in UI instead
+                                } else {
+                                    result.links.thumbnail.href
+                                }
+                                
+                                // Create links object
+                                val artistLinks = ArtistLinks(
+                                    self = Link(href = result.links.self.href),
+                                    permalink = Link(href = result.links.permalink.href),
+                                    thumbnail = Link(href = result.links.thumbnail.href)
+                                )
+                                
                                 Artist(
-                                    id = result.links.self.href.split("/").last(),
+                                    id = artistId,
                                     name = result.title,
-                                    imageUrl = result.links.thumbnail.href,
+                                    imageUrl = imageUrl,
                                     nationality = null,
                                     birthday = null,
                                     deathday = null,
-                                    biography = result.description
+                                    biography = result.description,
+                                    links = artistLinks,
+                                    isFavorite = _favouriteIds.value.contains(artistId)
                                 )
                             }
                         } else {
@@ -93,6 +126,38 @@ class HomeViewModel @Inject constructor(
         _searchResults.value = emptyList()
         _isLoading.value = false
     }
+
+    // --- Function to fetch artist details and artworks ---
+    fun fetchArtistDetailsAndArtworks(artistId: String) {
+        viewModelScope.launch {
+            _isDetailLoading.value = true
+            _detailError.value = null
+            _artistDetail.value = null // Clear previous data
+            _artistArtworks.value = emptyList() // Clear previous data
+
+            try {
+                // Fetch details and artworks concurrently (or sequentially if needed)
+                // For simplicity, fetching sequentially here
+                val artistResponse = artistRepository.getArtistDetailsById(artistId)
+                _artistDetail.value = artistResponse
+
+                val artworksResponse = artistRepository.getArtistArtworks(artistId)
+                _artistArtworks.value = artworksResponse
+
+            } catch (e: IOException) {
+                _detailError.value = "Network error fetching details. Please check connection."
+                _artistDetail.value = null
+                _artistArtworks.value = emptyList()
+            } catch (e: Exception) {
+                _detailError.value = "Error fetching details: ${e.message ?: "Unknown error"}"
+                _artistDetail.value = null
+                _artistArtworks.value = emptyList()
+            } finally {
+                _isDetailLoading.value = false
+            }
+        }
+    }
+    // ----------------------------------------------------
 
     init {
         // Load initial favourites

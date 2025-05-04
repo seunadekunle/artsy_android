@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -62,10 +63,12 @@ fun HomeScreen(
     ) {
         // Date
         Text(
-            text = "31 March 2025",
+            text = "31 March 2025",
             style = MaterialTheme.typography.titleSmall,
-            color = Color.Gray,
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+            color = Color(0xDF555555),
+            fontWeight = FontWeight.W500,
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
         Column(
@@ -76,15 +79,19 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF0F0F6))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
             ) {
                 Text(
                     text = "Favorites",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                        .align(Alignment.Center)
                 )
             }
             // Login button
@@ -111,8 +118,8 @@ fun HomeScreen(
             ) {
                 Text(
                     text = "Powered by Artsy",
-                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                    color = Color.Black,
                     modifier = Modifier
                         .clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://artsy.org"))
@@ -128,70 +135,7 @@ fun HomeScreen(
     }
 }
 
-fun formatArtistInfo(artist: Artist): String {
-    val details = mutableListOf<String?>()
-    details.add(artist.nationality)
-    val birth = artist.birthday
-    val death = artist.deathday
-    if (birth != null || death != null) {
-        details.add("(${birth ?: "?"} - ${death ?: "?"})")
-    }
-    return details.filterNotNull().filter { it.isNotEmpty() }.joinToString(", ")
-}
 
-@Preview(showBackground = true)
-@Composable
-fun ArtistCard(
-    artist: Artist = Artist(
-        id = "123",
-        name = "Pablo Picasso",
-        nationality = "Spanish",
-        birthday = "1881",
-        deathday = "1973",
-        imageUrl = "",
-        biography = "Pablo Picasso was a Spanish painter, sculptor, printmaker, ceramicist and theatre designer."
-    ),
-    artistInfo: String = "Spanish, (1881 - 1973)",
-    isFav: Boolean = false,
-    onFavToggle: () -> Unit = {},
-    onClick: () -> Unit = {}
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(10.dp)
-        ) {
-            AsyncImage(
-                model = artist.imageUrl,
-                contentDescription = artist.name,
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(artist.name, style = MaterialTheme.typography.bodyLarge)
-                Text(artistInfo, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = { onFavToggle() }) {
-                Icon(
-                    imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = "Favorite",
-                    tint = if (isFav) Color(0xFFFFC107) else Color.Gray
-                )
-            }
-        }
-    }
-}
 
 // Create a separate preview version of HomeScreen that doesn't depend on ViewModels
 @Preview(showBackground = true)
@@ -221,7 +165,7 @@ fun HomeScreenPreview() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF0F0F6))
+                    .background(Color.Gray)
             ) {
                 Text(
                     text = "Favorites",
@@ -274,35 +218,6 @@ fun HomeScreenPreview() {
     }
 
 
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun SearchField(
-    value: String = "",
-    onValueChange: (String) -> Unit = {}
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text("Search for artists...") },
-        singleLine = true
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun LoadingIndicator() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
 }
 
 @Preview(showBackground = true)
