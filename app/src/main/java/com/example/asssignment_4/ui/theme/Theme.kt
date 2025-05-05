@@ -2,12 +2,10 @@ package com.example.asssignment_4.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -16,26 +14,26 @@ import androidx.core.view.WindowCompat
 
 // Define light colors
 private val LightColors = lightColorScheme(
-    primary = artsyBlue,
-    secondary = artsyLightBlue,
-    background = artsyLightBlue,
-    surface = artsyLightBlue,
-    onPrimary = Color.White,
-    onSecondary = Color.Black,
+    primary = lightArtsyBlue,
+    secondary = lightArtsyDarkBlue,
+    background = Color.White,
+    surface = lightArtsyGray,
+    onPrimary = Color.Black,
+    onSecondary = Color.White,
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
 )
 
 // Define dark colors
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFBB86FC),
-    secondary = Color(0xFF03DAC5),
-    background = Color(0xFF121212),
-    surface = Color(0xFF121212),
-    onPrimary = Color.Black,
+    primary = artsyDarkBlue,
+    secondary = artsyBlue,
+    background = Color.Black,
+    surface = darkArtsyGray,
+    onPrimary = Color.White,
     onSecondary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White,
+    onBackground = Color(0xFF1C1B1F),
+    onSurface = Color(0xFFE3E3E3),
 )
 
 @Composable

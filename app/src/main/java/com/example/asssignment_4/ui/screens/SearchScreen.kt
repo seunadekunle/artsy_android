@@ -1,7 +1,5 @@
 package com.example.asssignment_4.ui.screens
 
-import android.util.Log
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,23 +8,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -35,8 +28,6 @@ import coil.request.ImageRequest
 import com.example.asssignment_4.R
 import com.example.asssignment_4.model.Artist
 import com.example.asssignment_4.ui.navigation.Screen
-import com.example.asssignment_4.ui.theme.artsyBlue
-import com.example.asssignment_4.ui.theme.artsyLightBlue
 import com.example.asssignment_4.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,12 +83,14 @@ fun SearchResultCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.background),
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 2.dp
+
     ) {
         // we'll fix the height to something banner‑ish
-        Box(modifier = Modifier.height(195.dp)) {
+        Box(modifier = Modifier.height(185.dp)) {
             // 1) full‑size background image
             if (artist.imageUrl == "/assets/shared/missing_image.png") {
                 AsyncImage(
@@ -130,31 +123,36 @@ fun SearchResultCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(40.dp)
                     .align(Alignment.BottomCenter)
-                    .background(
-                        // Use artsyLightBlue with 80% opacity
-                        artsyBlue.copy(alpha = 0.7f)
-                    )
-                    .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                    .padding(start = 8.dp, end = 16.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 8.dp)
                 ) {
                     Text(
                         text = artist.name,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.weight(1f))
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = "Go to details",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
+            
             }
         }
     }

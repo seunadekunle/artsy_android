@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.asssignment_4.model.Artist
 import com.example.asssignment_4.model.ArtistLinks
 import com.example.asssignment_4.model.Artwork
+import com.example.asssignment_4.model.Gene
 import com.example.asssignment_4.model.Link
 import com.example.asssignment_4.model.SearchResponse
 import com.example.asssignment_4.repository.ArtistRepository
@@ -16,7 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.IOException
-
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -53,6 +53,10 @@ class HomeViewModel @Inject constructor(
 
     private val _detailError = MutableStateFlow<String?>(null)
     val detailError: StateFlow<String?> = _detailError.asStateFlow()
+    
+    // Artwork Categories State
+    private val _artworkCategories = MutableStateFlow<Map<String, List<Gene>>>(emptyMap())
+    val artworkCategories: StateFlow<Map<String, List<Gene>>> = _artworkCategories.asStateFlow()
     // ----------------------------------------
 
     // Debounce search term changes
@@ -142,7 +146,8 @@ class HomeViewModel @Inject constructor(
                 _artistDetail.value = artistResponse
 
                 val artworksResponse = artistRepository.getArtistArtworks(artistId)
-                _artistArtworks.value = artworksResponse
+                // Extract the list from the nested structure, handle potential nulls
+                _artistArtworks.value = artworksResponse.embedded?.artworks ?: emptyList()
 
             } catch (e: IOException) {
                 _detailError.value = "Network error fetching details. Please check connection."
@@ -158,6 +163,58 @@ class HomeViewModel @Inject constructor(
         }
     }
     // ----------------------------------------------------
+
+    // --- Function to clear artist detail state --- 
+    fun clearArtistDetails() {
+        _artistDetail.value = null
+        _artistArtworks.value = emptyList()
+        _detailError.value = null
+        _isDetailLoading.value = false
+        // Don't clear categories as they might be reused
+    }
+    
+    /**
+     * Fetches categories for a specific artwork
+     * @param artworkId The ID of the artwork to fetch categories for
+     */
+    fun fetchArtworkCategories(artworkId: String) {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("HomeViewModel", "Starting to fetch categories for artwork: $artworkId")
+                
+                // Check if we already have categories for this artwork
+                if (_artworkCategories.value.containsKey(artworkId)) {
+                    android.util.Log.d("HomeViewModel", "Categories already cached for artwork: $artworkId")
+                    return@launch // Skip if already fetched
+                }
+                
+                android.util.Log.d("HomeViewModel", "Calling repository for categories for artwork: $artworkId")
+                val categories = artistRepository.getArtworkCategories(artworkId)
+                android.util.Log.d("HomeViewModel", "Retrieved ${categories.size} categories for artwork: $artworkId")
+                
+                // Update the map with new categories
+                val updatedMap = _artworkCategories.value.toMutableMap()
+                updatedMap[artworkId] = categories
+                _artworkCategories.value = updatedMap
+                
+                android.util.Log.d("HomeViewModel", "Updated categories state with ${categories.size} categories for artwork: $artworkId")
+                
+            } catch (e: Exception) {
+                // Log error but don't update global error state to avoid disrupting the UI
+                android.util.Log.e("HomeViewModel", "Error fetching categories for artwork $artworkId: ${e.message}", e)
+            }
+        }
+    }
+    
+    /**
+     * Gets categories for a specific artwork from the cached state
+     * @param artworkId The ID of the artwork to get categories for
+     * @return List of Gene objects representing categories, or empty list if none found
+     */
+    fun getArtworkCategories(artworkId: String): List<Gene> {
+        return _artworkCategories.value[artworkId] ?: emptyList()
+    }
+    // --------------------------------------------
 
     init {
         // Load initial favourites

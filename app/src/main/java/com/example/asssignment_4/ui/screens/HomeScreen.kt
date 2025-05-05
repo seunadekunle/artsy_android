@@ -5,18 +5,12 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -28,12 +22,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import coil.compose.AsyncImage
-import com.example.asssignment_4.model.Artist
-import com.example.asssignment_4.ui.navigation.Screen
-import com.example.asssignment_4.ui.theme.artsyBlue
-import com.example.asssignment_4.ui.theme.artsyDarkBlue
-import com.example.asssignment_4.ui.theme.artsyLightBlue
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
 
@@ -60,6 +48,7 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Date
         Text(
@@ -74,19 +63,19 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(32.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
                 Text(
                     text = "Favorites",
                     style = MaterialTheme.typography.titleLarge,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -100,12 +89,13 @@ fun HomeScreen(
                     onClick = { },
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = artsyDarkBlue
+                        containerColor = MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Text(
                         "Log in to see favorites",
-                        style = MaterialTheme.typography.titleSmall
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSecondary
                     )
                 }
             }
@@ -119,7 +109,7 @@ fun HomeScreen(
                 Text(
                     text = "Powered by Artsy",
                     style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://artsy.org"))
@@ -171,7 +161,7 @@ fun HomeScreenPreview() {
                     text = "Favorites",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
@@ -182,7 +172,7 @@ fun HomeScreenPreview() {
                     onClick = { },
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = artsyDarkBlue
+                        containerColor = MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Text(

@@ -1,13 +1,11 @@
 package com.example.asssignment_4.ui
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -17,7 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
@@ -25,28 +25,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import android.util.Log
 import com.example.asssignment_4.ui.navigation.AppNavGraph
 import com.example.asssignment_4.ui.navigation.Screen
 import com.example.asssignment_4.ui.screens.SearchResultCard
 import com.example.asssignment_4.ui.theme.YourAppTheme
 import com.example.asssignment_4.ui.theme.artsyBlue
-import com.example.asssignment_4.ui.theme.artsyLightBlue
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
-import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.style.TextDecoration
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun MainScaffold(
-    navController: NavHostController,
-    isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    navController: NavHostController
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val currentUser by authViewModel.currentUser.collectAsState()
@@ -59,16 +50,7 @@ fun MainScaffold(
     val isLoginScreen = currentRoute == Screen.Login.route
     val isSignupScreen = currentRoute == Screen.Register.route
     val homeViewModel: HomeViewModel = hiltViewModel()
-
-    // Check if the current route is the ArtistDetail screen
-    // Note: Comparing against the route *template* from Screen.ArtistDetail.route
-    val isDetailScreen = currentRoute == Screen.ArtistDetail.route 
-    val detailArtistName = if (isDetailScreen) {
-        // Extract artist name from arguments
-        navBackStackEntry?.arguments?.getString("artistName")?.replace("%20", " ") ?: "Artist Detail"
-    } else {
-        null
-    }
+    val artistDetail by homeViewModel.artistDetail.collectAsState() // Collect artist details for title
 
     var searchTerm by remember { mutableStateOf("") }
 
@@ -90,180 +72,112 @@ fun MainScaffold(
         slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
     }
 
-    Scaffold(
-        topBar = {
-            // Conditionally display TopAppBar based on route
-            when {
-                isSearchScreen -> {
-                    // Search TopAppBar (existing logic)
-                    TopAppBar(
-                        title = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "Search",
-                                        tint = LocalContentColor.current.copy(alpha = 0.75f)
+    // --- DEBUG LOG --- 
+    Log.d("MainScaffoldRouteCheck", "Current Route = '$currentRoute'")
+    // -----------------
+
+    // Determine which TopAppBar composable to show based on the current route
+    val topBarToShow: (@Composable () -> Unit)? = when {
+        currentRoute?.startsWith(Screen.ArtistDetail.route.substringBefore('{')) == true -> {
+            null // Explicitly show NO TopAppBar from MainScaffold on ArtistDetailScreen
+        }
+        isSearchScreen -> {
+            @Composable { // Lambda for Search TopAppBar
+                TopAppBar(
+                    title = {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = LocalContentColor.current.copy(alpha = 0.75f))
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                Box(modifier = Modifier.weight(1f)) {
+                                    BasicTextField(
+                                        value = searchTerm,
+                                        onValueChange = {
+                                            searchTerm = it
+                                            if (it.isNotEmpty()) { homeViewModel.setSearchTerm(it) }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(start = 6.dp),
+                                        singleLine = true,
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.W500, textDecoration = TextDecoration.Underline, color = LocalContentColor.current),
+                                        cursorBrush = SolidColor(LocalContentColor.current)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        BasicTextField(
-                                            value = searchTerm,
-                                            onValueChange = {
-                                                searchTerm = it
-                                                if (it.isNotEmpty()) {
-                                                    homeViewModel.setSearchTerm(it)
-                                                }
-                                            },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(start = 6.dp),
-                                            singleLine = true,
-                                            textStyle = LocalTextStyle.current.copy(
-                                                fontSize = 22.sp,
-                                                fontWeight = FontWeight.W500,
-                                                textDecoration = TextDecoration.Underline,
-                                                color = LocalContentColor.current
-                                            ),
-                                            cursorBrush = SolidColor(LocalContentColor.current)
-                                        )
-                                        if (searchTerm.isEmpty()) {
-                                            Text(
-                                                text = "Search artists…",
-                                                fontSize = 22.sp,
-                                                color = LocalContentColor.current.copy(alpha = 0.6f),
-                                                modifier = Modifier.padding(start = 6.dp)
-                                            )
-                                        }
-                                    }
-
-                                    IconButton(onClick = {
-                                        homeViewModel.setSearchTerm("")
-                                        searchTerm = ""
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Clear",
-                                            tint = LocalContentColor.current.copy(alpha = 1f)
-                                        )
+                                    if (searchTerm.isEmpty()) {
+                                        Text("Search artists…", fontSize = 22.sp, color = LocalContentColor.current.copy(alpha = 0.6f), modifier = Modifier.padding(start = 6.dp))
                                     }
                                 }
-                            }
 
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = artsyBlue,
-                        )
-                    )
-                }
-                isDetailScreen && detailArtistName != null -> {
-                    // Artist Detail TopAppBar
-                    TopAppBar(
-                        title = { Text(detailArtistName) }, // Use extracted name
-                        navigationIcon = {
-                            IconButton(onClick = { navController.popBackStack() }) {
-                                Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = artsyBlue, // Keep consistent color
-                        )
-                    )
-                }
-                      currentRoute == Screen.Home.route -> {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                "Artist Search",
-                                style = MaterialTheme.typography.titleLarge
-                                    .copy(fontWeight = FontWeight.Medium)
-                            ) },
-
-                        actions = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Add Search Icon Button HERE
-                                IconButton(onClick = { navController.navigate(Screen.Search.route)}) {
-                                    Icon(Icons.Filled.Search, contentDescription = "Search")
-                                }
-                                // Profile Icon/Menu Button (existing)
-                                IconButton(onClick = { showMenu = true }) {
-                                    Icon(
-                                        imageVector = if (isLoggedIn) Icons.Filled.Person else Icons.Outlined.Person,
-                                        contentDescription = "Profile"
-                                    )
-                                }
-                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                    if (isLoggedIn) {
-                                        DropdownMenuItem(text = { Text("Favorites") }, onClick = { 
-                                            navController.navigate(Screen.Favourites.route)
-                                            showMenu = false
-                                         })
-                                        DropdownMenuItem(text = { Text("Logout") }, onClick = { authViewModel.logoutUser() ; showMenu = false })
-                                    } else {
-                                        DropdownMenuItem(text = { Text("Login") }, onClick = { navController.navigate(Screen.Login.route); showMenu = false })
-                                        DropdownMenuItem(text = { Text("Register") }, onClick = { navController.navigate(Screen.Register.route) ; showMenu = false })
-                                    }
+                                IconButton(onClick = { homeViewModel.setSearchTerm(""); searchTerm = "" }) {
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = LocalContentColor.current.copy(alpha = 1f))
                                 }
                             }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = artsyBlue,
-                        )
-                    )
-                }
-                else -> {
-                    // Default TopAppBar (for Home, Login, etc.)
-                    TopAppBar(
-                        title = { Text("Artsy App") },
-                        actions = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Switch(checked = isDarkTheme, onCheckedChange = { onToggleTheme() })
-                                IconButton(onClick = { showMenu = true }) {
-                                    Icon(
-                                        imageVector = if (isLoggedIn) Icons.Filled.Person else Icons.Outlined.Person,
-                                        contentDescription = "Profile"
-                                    )
-                                }
-                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                    if (isLoggedIn) {
-                                        DropdownMenuItem(text = { Text("Favorites") }, onClick = { 
-                                            navController.navigate(Screen.Favourites.route)
-                                            showMenu = false
-                                         })
-                                        DropdownMenuItem(text = { Text("Logout") }, onClick = { authViewModel.logoutUser() ; showMenu = false })
-                                    } else {
-                                        DropdownMenuItem(text = { Text("Login") }, onClick = { navController.navigate(Screen.Login.route); showMenu = false })
-                                        DropdownMenuItem(text = { Text("Register") }, onClick = { navController.navigate(Screen.Register.route) ; showMenu = false })
-                                    }
-                                }
-                            }
-                        },
-                        navigationIcon = {
-                            if (currentRoute != Screen.Home.route) { // Show back arrow if not on Home
-                                IconButton(onClick = { navController.popBackStack() }) {
-                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                                }
-                            } else {
-                                IconButton(onClick = { navController.navigate(Screen.Search.route)}) {
-                                    Icon(Icons.Filled.Search, contentDescription = "Search")
-                                }
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = artsyBlue,
-                        )
-                    )
-                }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+                )
             }
-        },
-        containerColor = artsyLightBlue,
+        }
+        currentRoute == Screen.Home.route -> {
+             @Composable { // Lambda for Home TopAppBar
+                TopAppBar(
+                    title = { Text("Artist Search", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimary)) },
+                    actions = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { navController.navigate(Screen.Search.route) }) { 
+                                Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onPrimary) 
+                            }
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(
+                                    imageVector = if (isLoggedIn) Icons.Filled.Person else Icons.Outlined.Person, 
+                                    contentDescription = "Profile", 
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                if (isLoggedIn) {
+                                    DropdownMenuItem(text = { Text("Favorites") }, onClick = { navController.navigate(Screen.Favourites.route); showMenu = false })
+                                    DropdownMenuItem(text = { Text("Logout") }, onClick = { authViewModel.logoutUser(); showMenu = false })
+                                } else {
+                                    DropdownMenuItem(text = { Text("Login") }, onClick = { navController.navigate(Screen.Login.route); showMenu = false })
+                                    DropdownMenuItem(text = { Text("Register") }, onClick = { navController.navigate(Screen.Register.route); showMenu = false })
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
+        // Add other specific routes here if they need a TopAppBar from MainScaffold
+        else -> {
+             @Composable { // Lambda for Default TopAppBar (Login, Register, etc.)
+                TopAppBar(
+                    title = { Text("Artsy App") }, // Default Title
+                    actions = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(imageVector = if (isLoggedIn) Icons.Filled.Person else Icons.Outlined.Person, contentDescription = "Profile")
+                            }
+                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                if (isLoggedIn) {
+                                    DropdownMenuItem(text = { Text("Favorites") }, onClick = { navController.navigate(Screen.Favourites.route); showMenu = false })
+                                    DropdownMenuItem(text = { Text("Logout") }, onClick = { authViewModel.logoutUser(); showMenu = false })
+                                } else {
+                                    DropdownMenuItem(text = { Text("Login") }, onClick = { navController.navigate(Screen.Login.route); showMenu = false })
+                                    DropdownMenuItem(text = { Text("Register") }, onClick = { navController.navigate(Screen.Register.route); showMenu = false })
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = artsyBlue)
+                )
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = { topBarToShow?.invoke() },
+        containerColor = MaterialTheme.colorScheme.background,
         content = { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
                 if (isSearchScreen) {
@@ -314,9 +228,7 @@ fun MainScaffold(
 fun MainScaffoldPreview() {
     YourAppTheme(darkTheme = false) {
         MainScaffold(
-            navController = rememberNavController(),
-            isDarkTheme = false,
-            onToggleTheme = {}
+            navController = rememberNavController()
         )
     }
 }

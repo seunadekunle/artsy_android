@@ -8,14 +8,16 @@ data class Artwork(
     val date: String?,
     val category: String?,
     val medium: String?,
-    val imageUrl: String?,
-    @SerializedName("_links") val links: ArtworkLinks? = null,
+    @SerializedName("_links") val links: ImageLinks? = null,
     val categories: List<Gene> = emptyList()
+)
+
+data class ImageLinks(
+    val thumbnail: Link?,
+    val image: Link?
 )
 
 data class ArtworkLinks(
     val self: Link? = null,
-    val thumbnail: Link? = null,
-    val image: Link? = null,
     val permalink: Link? = null
 )
