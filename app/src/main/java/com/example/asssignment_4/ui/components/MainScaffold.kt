@@ -81,6 +81,9 @@ fun MainScaffold(
         currentRoute?.startsWith(Screen.ArtistDetail.route.substringBefore('{')) == true -> {
             null // Explicitly show NO TopAppBar from MainScaffold on ArtistDetailScreen
         }
+        currentRoute?.startsWith(Screen.Login.route.substringBefore('{')) == true -> {
+            null
+        }
         isSearchScreen -> {
             @Composable { // Lambda for Search TopAppBar
                 TopAppBar(
