@@ -51,20 +51,27 @@ class AuthViewModel @Inject constructor(
             _authError.value = null
             try {
                 val response = authRepository.getProfile()
-                if (response.isSuccessful) {
+                if (response.isSuccessful && response.body() != null) {
                     _currentUser.value = response.body()
                     _authError.value = null
+                    _authEvent.emit(AuthEvent.Success("Session restored"))
                 } else {
                     _currentUser.value = null
                     if (response.code() != 401) {
-                        _authError.value = "Auth Check Failed: ${response.code()}"
+                        val errorMsg = "Auth Check Failed: ${response.code()}"
+                        _authError.value = errorMsg
+                        _authEvent.emit(AuthEvent.Failure(errorMsg))
                     } else {
+                        // Clear session on 401
                         _authError.value = null
+                        cookieJar.clearSession()
                     }
                 }
             } catch (e: Exception) {
                 _currentUser.value = null
-                _authError.value = "Error checking login: ${e.message}"
+                val errorMsg = "Error checking login: ${e.message}"
+                _authError.value = errorMsg
+                _authEvent.emit(AuthEvent.Failure(errorMsg))
             } finally {
                 _isLoading.value = false
             }
@@ -81,6 +88,8 @@ class AuthViewModel @Inject constructor(
                     _currentUser.value = response.body()?.user
                     // PersistentCookieJar handles cookie persistence automatically
                     _authEvent.emit(AuthEvent.Success("Logged in successfully"))
+                    // Add delay before navigation
+                    kotlinx.coroutines.delay(1500)
                 } else {
                     val errorMsg = response.body()?.message ?: "Login failed: ${response.code()}"
                     _authError.value = errorMsg
@@ -106,6 +115,8 @@ class AuthViewModel @Inject constructor(
                     _currentUser.value = response.body()?.user
                     // PersistentCookieJar handles cookie persistence automatically
                     _authEvent.emit(AuthEvent.Success("Registered successfully"))
+                    // Add delay before navigation
+                    kotlinx.coroutines.delay(1500)
                 } else {
                     val errorMsg = response.body()?.message ?: "Registration failed: ${response.code()}"
                     _authError.value = errorMsg

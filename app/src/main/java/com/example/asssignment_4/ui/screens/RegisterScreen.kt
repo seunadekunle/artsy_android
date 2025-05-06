@@ -240,7 +240,7 @@ fun RegisterScreen(
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(37.dp),
+                    .height(40.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isLoading) Color.Gray else lightArtsyDarkBlue,
                     contentColor = Color.White

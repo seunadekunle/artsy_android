@@ -10,6 +10,7 @@ data class User(
     @SerialName("fullname")
     val fullName: String,
     val email: String,
+    @SerialName("profileImageUrl")
     val avatarUrl: String? = null,
     val favourites: List<String>? = null
 )

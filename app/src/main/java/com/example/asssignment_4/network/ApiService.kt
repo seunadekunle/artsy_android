@@ -51,11 +51,11 @@ interface ApiService {
 
     // Similar Artists
     @GET("/api/artists/{id}/similar")
-    suspend fun getSimilarArtists(@Path("id") artistId: String): Response<List<Artist>>
+    suspend fun getSimilarArtists(@Path("id") artistId: String): Response<SimilarArtistsResponse>
 
     @GET("/api/artists/{id}/similar")
     suspend fun getSimilarArtists(
         @Path("id") artistId: String,
         @Header("Authorization") authToken: String
-    ): Response<List<Artist>>
+    ): Response<SimilarArtistsResponse>
 }

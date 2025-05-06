@@ -7,6 +7,7 @@ import com.example.asssignment_4.model.FavouriteRequest
 import com.example.asssignment_4.model.Gene
 import com.example.asssignment_4.model.PartnerShowResponse
 import com.example.asssignment_4.model.SearchResponse
+import com.example.asssignment_4.model.SimilarArtistsResponse
 import com.example.asssignment_4.network.ApiService
 import retrofit2.Response
 import javax.inject.Inject
@@ -64,7 +65,7 @@ class ArtistRepository @Inject constructor(private val api: ApiService) {
     suspend fun getSimilarArtists(
         artistId: String,
         authToken: String? = null
-    ): Response<List<Artist>> {
+    ): Response<SimilarArtistsResponse> {
         return try {
             if (authToken != null) {
                 api.getSimilarArtists(artistId, "Bearer $authToken")

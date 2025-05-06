@@ -8,6 +8,7 @@ import com.example.asssignment_4.model.Artwork
 import com.example.asssignment_4.model.Gene
 import com.example.asssignment_4.model.Link
 import com.example.asssignment_4.model.SearchResponse
+import com.example.asssignment_4.model.SimilarArtistsResponse
 import com.example.asssignment_4.repository.ArtistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -69,10 +70,15 @@ class HomeViewModel @Inject constructor(
                 _isDetailLoading.value = true
                 val response = artistRepository.getSimilarArtists(artistId, authToken)
                 if (response.isSuccessful) {
-                    _similarArtists.value = response.body() ?: emptyList()
+                    val similarArtistsResponse = response.body()
+                    if (similarArtistsResponse != null) {
+                        _similarArtists.value = similarArtistsResponse.artists
+                    } else {
+                        _similarArtists.value = emptyList()
+                        _detailError.value = "No similar artists found"
+                    }
                 } else {
-                    _detailError.value = "Failed to fetch similar artists"
-                    _similarArtists.value = emptyList()
+                    _detailError.value = "Failed to fetch similar artists: ${response.code()}"
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error fetching similar artists: ${e.message}")
@@ -255,18 +261,23 @@ class HomeViewModel @Inject constructor(
     private fun loadFavourites() {
         viewModelScope.launch {
             try {
-                val response = artistRepository.getFavourites() // Assuming this returns Response<List<Artist>>
+                Log.d("HomeViewModel", "Loading favorites...")
+                val response = artistRepository.getFavourites()
                 if (response.isSuccessful) {
                     val favList = response.body() ?: emptyList()
+                    Log.d("HomeViewModel", "Loaded ${favList.size} favorites: ${favList.map { it.id }}")
                     _favourites.value = favList
                     _favouriteIds.value = favList.mapNotNull { it.id }.toSet()
+                    Log.d("HomeViewModel", "Updated favorite IDs: ${_favouriteIds.value}")
                 } else {
-                     _error.value = "Failed to load favourites: ${response.code()}" // Handle error appropriately
+                    Log.e("HomeViewModel", "Failed to load favorites: ${response.code()}")
+                    _error.value = "Failed to load favourites: ${response.code()}"
                 }
             } catch (e: Exception) {
-                 _error.value = "Error loading favourites: ${e.message}"
-                 _favourites.value = emptyList() // Clear on error
-                 _favouriteIds.value = emptySet()
+                Log.e("HomeViewModel", "Error loading favorites", e)
+                _error.value = "Error loading favourites: ${e.message}"
+                _favourites.value = emptyList() // Clear on error
+                _favouriteIds.value = emptySet()
             }
         }
     }
@@ -276,6 +287,13 @@ class HomeViewModel @Inject constructor(
             try {
                 val response = artistRepository.addFavourite(artistId)
                 if (response.isSuccessful) {
+                    // Update local state immediately
+                    _favouriteIds.value = _favouriteIds.value + artistId
+                    val artist = _searchResults.value.find { it.id == artistId }
+                    if (artist != null) {
+                        _favourites.value = _favourites.value + artist
+                    }
+                    // Then refresh from server
                     loadFavourites()
                 } else {
                     _error.value = "Failed to add to favorites: ${response.code()}"
@@ -291,11 +309,16 @@ class HomeViewModel @Inject constructor(
             try {
                 val response = artistRepository.removeFavourite(artistId)
                 if (response.isSuccessful) {
+                    // Update local state immediately
+                    _favouriteIds.value = _favouriteIds.value - artistId
+                    _favourites.value = _favourites.value.filter { it.id != artistId }
+                    // Then refresh from server
                     loadFavourites()
                 } else {
                     _error.value = "Failed to remove from favorites: ${response.code()}"
                 }
             } catch (e: Exception) {
+                _error.value = "Error removing from favorites: ${e.message}"
             }
         }
     }

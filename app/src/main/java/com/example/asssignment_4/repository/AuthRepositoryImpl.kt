@@ -19,7 +19,7 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun register(email: String, password: String, fullName: String): Response<AuthResponse> {
-        return apiService.register(RegisterRequest(email, password, fullName))
+        return apiService.register(RegisterRequest(email = email, password = password, fullname = fullName))
     }
 
     override suspend fun getProfile(): Response<User> {
