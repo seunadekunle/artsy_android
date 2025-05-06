@@ -48,11 +48,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.asssignment_4.ui.components.CategoryDialog
+import com.example.asssignment_4.ui.components.SearchResultCard
+import com.example.asssignment_4.ui.navigation.Screen
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,10 +67,14 @@ fun ArtistDetailScreen(
     paddingValues: PaddingValues
 ) {
 
-    LaunchedEffect(artistId) {
+    LaunchedEffect(artistId, authViewModel.currentUser.value) { // Keyed by currentUser to re-fetch on login/logout
         // Call the ViewModel function to fetch data
         if (artistId.isNotEmpty()) { // Ensure ID is valid before fetching
             viewModel.fetchArtistDetailsAndArtworks(artistId)
+            // Fetch similar artists if user is logged in
+            if (authViewModel.currentUser.value != null) {
+                viewModel.fetchSimilarArtists(artistId = artistId, authToken = null) // Pass null, rely on cookie jar
+            }
         }
     }
 
@@ -86,13 +93,22 @@ fun ArtistDetailScreen(
     val artist = viewModel.artistDetail.collectAsState().value
     val artworks = viewModel.artistArtworks.collectAsState().value
     
-    // Check login status
+    // Check login status and favorites
     val currentUser = authViewModel.currentUser.collectAsState().value
     val isLoggedIn = currentUser != null
+    val favouriteIds = viewModel.favouriteIds.collectAsState().value
+    val isFavorite = artist?.id?.let { favouriteIds.contains(it) } ?: false
+    val similarArtists = viewModel.similarArtists.collectAsState().value
 
     // Derive display values from the collected artist state
     val artistSubtitle = formatArtistInfo(artist = artist)
     val artistBio = artist?.biography ?: ""
+
+    LaunchedEffect(artistId, selectedTab, isLoggedIn) { // Removed tokenValue from key
+        if (isLoggedIn && selectedTab == 3) { // Similar tab
+            viewModel.fetchSimilarArtists(artistId = artistId, authToken = null) // Pass null, rely on cookie jar
+        }
+    }
 
     // State for category dialog
     var showCategoryDialog by remember { mutableStateOf(false) }
@@ -101,19 +117,38 @@ fun ArtistDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(artist?.name ?: "Loading...") }, 
+                title = {
+                    Text(
+                        text = artist?.name ?: "Loading...",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 },
                 actions = {
-                    // Add favorite star icon button (only if logged in)
-                    if (isLoggedIn) {
-                        IconButton(onClick = { /* Toggle favorite */ }) {
+                    if (isLoggedIn && artist != null) {
+                        IconButton(
+                            onClick = {
+                                if (isFavorite) {
+                                    viewModel.removeFavorite(artist.id)
+                                } else {
+                                    viewModel.addFavorite(artist.id)
+                                }
+                            }
+                        ) {
                             Icon(
-                                imageVector = Icons.Filled.StarBorder,
-                                contentDescription = "Favorite",
+                                imageVector = if (isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
                                 tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
@@ -377,11 +412,45 @@ fun ArtistDetailScreen(
                             }
                         } else {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "Similar artists feature coming soon",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Color.Gray
-                                )
+                                if (isLoading) {
+                                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                } else if (similarArtists.isEmpty()) {
+                                    Text(
+                                        text = "No similar artists found",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(16.dp)
+                                    )
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(similarArtists) { artist ->
+                                            SearchResultCard(
+                                                artist = artist,
+                                                isLoggedIn = true,
+                                                isFavorite = favouriteIds.contains(artist.id),
+                                                onFavoriteClick = {
+                                                    if (favouriteIds.contains(artist.id)) {
+                                                        viewModel.removeFavorite(artist.id)
+                                                    } else {
+                                                        viewModel.addFavorite(artist.id)
+                                                    }
+                                                },
+                                                onClick = {
+                                                    navController.navigate(
+                                                        Screen.ArtistDetail.createRoute(artist.id)
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else {

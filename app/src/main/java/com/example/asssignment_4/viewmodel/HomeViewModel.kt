@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.IOException
+import android.util.Log
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -38,6 +39,10 @@ class HomeViewModel @Inject constructor(
     // Favourites State
     private val _favourites = MutableStateFlow<List<Artist>>(emptyList())
     val favourites: StateFlow<List<Artist>> = _favourites.asStateFlow()
+
+    private val _authToken = MutableStateFlow<String?>(null)
+    val authToken: StateFlow<String?> = _authToken.asStateFlow()
+
     private val _favouriteIds = MutableStateFlow<Set<String>>(emptySet())
     val favouriteIds: StateFlow<Set<String>> = _favouriteIds.asStateFlow()
 
@@ -53,6 +58,31 @@ class HomeViewModel @Inject constructor(
 
     private val _detailError = MutableStateFlow<String?>(null)
     val detailError: StateFlow<String?> = _detailError.asStateFlow()
+
+    // Similar Artists State
+    private val _similarArtists = MutableStateFlow<List<Artist>>(emptyList())
+    val similarArtists: StateFlow<List<Artist>> = _similarArtists.asStateFlow()
+
+    fun fetchSimilarArtists(artistId: String, authToken: String?) {
+        viewModelScope.launch {
+            try {
+                _isDetailLoading.value = true
+                val response = artistRepository.getSimilarArtists(artistId, authToken)
+                if (response.isSuccessful) {
+                    _similarArtists.value = response.body() ?: emptyList()
+                } else {
+                    _detailError.value = "Failed to fetch similar artists"
+                    _similarArtists.value = emptyList()
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error fetching similar artists: ${e.message}")
+                _detailError.value = "Error loading similar artists: ${e.message}"
+                _similarArtists.value = emptyList()
+            } finally {
+                _isDetailLoading.value = false
+            }
+        }
+    }
     
     // Artwork Categories State
     private val _artworkCategories = MutableStateFlow<Map<String, List<Gene>>>(emptyMap())
@@ -170,7 +200,8 @@ class HomeViewModel @Inject constructor(
         _artistArtworks.value = emptyList()
         _detailError.value = null
         _isDetailLoading.value = false
-        // Don't clear categories as they might be reused
+        _artworkCategories.value = emptyMap()
+        _similarArtists.value = emptyList()
     }
     
     /**
@@ -240,25 +271,31 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun toggleFavourite(artist: Artist) {
-        val artistId = artist.id ?: return // Need an ID to toggle
+    fun addFavorite(artistId: String) {
         viewModelScope.launch {
-            val isCurrentlyFav = _favouriteIds.value.contains(artistId)
             try {
-                val response = if (isCurrentlyFav) { // Pass only artistId String
-                    artistRepository.removeFavourite(artistId)
-                } else {
-                    artistRepository.addFavourite(artistId)
-                }
-
+                val response = artistRepository.addFavourite(artistId)
                 if (response.isSuccessful) {
-                    // Reload favourites to get the updated list from the server
                     loadFavourites()
                 } else {
-                    _error.value = "Failed to update favourite: ${response.code()}"
+                    _error.value = "Failed to add to favorites: ${response.code()}"
                 }
             } catch (e: Exception) {
-                _error.value = "Error updating favourite: ${e.message}"
+                _error.value = "Error adding to favorites: ${e.message}"
+            }
+        }
+    }
+
+    fun removeFavorite(artistId: String) {
+        viewModelScope.launch {
+            try {
+                val response = artistRepository.removeFavourite(artistId)
+                if (response.isSuccessful) {
+                    loadFavourites()
+                } else {
+                    _error.value = "Failed to remove from favorites: ${response.code()}"
+                }
+            } catch (e: Exception) {
             }
         }
     }

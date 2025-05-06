@@ -1,15 +1,19 @@
 package com.example.asssignment_4.repository
 
 import android.util.Log
-import com.example.asssignment_4.model.*
+import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.model.ArtworksResponse
+import com.example.asssignment_4.model.FavouriteRequest
 import com.example.asssignment_4.model.Gene
-import com.example.asssignment_4.model.GenesResponse
 import com.example.asssignment_4.model.PartnerShowResponse
+import com.example.asssignment_4.model.SearchResponse
 import com.example.asssignment_4.network.ApiService
-import com.example.asssignment_4.network.FavouriteRequest
 import retrofit2.Response
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class ArtistRepository(private val api: ApiService) {
+@Singleton
+class ArtistRepository @Inject constructor(private val api: ApiService) {
     suspend fun searchArtists(query: String): Response<SearchResponse> = api.searchArtists(query)
     suspend fun getArtistDetails(id: String) = api.getArtistDetails(id)
     suspend fun getFavourites() = api.getFavourites()
@@ -56,11 +60,20 @@ class ArtistRepository(private val api: ApiService) {
         // You may need to implement it according to your requirements
         TODO("Not yet implemented")
     }
-}
 
-class AuthRepository(private val api: ApiService) {
-    suspend fun login(email: String, password: String) = api.login(com.example.asssignment_4.network.LoginRequest(email, password))
-    suspend fun register(fullName: String, email: String, password: String) = api.register(com.example.asssignment_4.network.RegisterRequest(fullName, email, password))
-    suspend fun getProfile() = api.getProfile()
-    suspend fun logout() = api.logout()
+    suspend fun getSimilarArtists(
+        artistId: String,
+        authToken: String? = null
+    ): Response<List<Artist>> {
+        return try {
+            if (authToken != null) {
+                api.getSimilarArtists(artistId, "Bearer $authToken")
+            } else {
+                api.getSimilarArtists(artistId)
+            }
+        } catch (e: Exception) {
+            Log.e("ArtistRepository", "Exception fetching similar artists: ${e.message}", e)
+            throw e
+        }
+    }
 }

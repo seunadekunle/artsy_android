@@ -3,14 +3,13 @@ package com.example.asssignment_4
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
-import com.example.asssignment_4.ui.MainScaffold
+import com.example.asssignment_4.ui.navigation.AppNavGraph
 import com.example.asssignment_4.ui.theme.YourAppTheme // Replace with your theme package
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -24,8 +23,9 @@ class MainActivity : ComponentActivity() {
             YourAppTheme() {
                 val navController = rememberNavController()
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    MainScaffold(
-                        navController = navController
+                    AppNavGraph(
+                        navController = navController,
+                        paddingValues = PaddingValues(0.dp)
                     )
                 }
             }

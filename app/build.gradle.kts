@@ -99,6 +99,12 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    
+    // PersistentCookieJar for cookie management
+    implementation("com.github.franmontiel:PersistentCookieJar:v1.0.1")
+    
+    // Lifecycle Runtime Compose
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     implementation(libs.okhttp)

@@ -3,7 +3,7 @@ package com.example.asssignment_4.ui.navigation
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel 
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -21,6 +21,7 @@ sealed class Screen(val route: String) {
             return "artist_detail/$artistId"
         }
     }
+
     object Login : Screen("login")
     object Register : Screen("register")
     object Favourites : Screen("favourites")
@@ -38,19 +39,7 @@ fun AppNavGraph(
         startDestination = Screen.Home.route
     ) {
         composable(
-            route = Screen.Home.route,
-            enterTransition = { 
-                slideInHorizontally(initialOffsetX = { it }) + fadeIn()
-            },
-            exitTransition = {
-                slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
-            },
-            popEnterTransition = {
-                slideInHorizontally(initialOffsetX = { -it }) + fadeIn()
-            },
-            popExitTransition = {
-                slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            }
+            route = Screen.Home.route
         ) {
             HomeScreen(navController = navController)
         }
@@ -61,7 +50,7 @@ fun AppNavGraph(
                 slideInHorizontally(initialOffsetX = { it }) + fadeIn()
             },
             exitTransition = {
-                slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+                slideOutHorizontally(targetOffsetX = { -it })
             },
             popEnterTransition = {
                 slideInHorizontally(initialOffsetX = { -it }) + fadeIn()
@@ -78,17 +67,17 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument("artistId") { type = NavType.StringType }
             ),
-            enterTransition = { 
-                slideInHorizontally(initialOffsetX = { it }) + fadeIn()
+            enterTransition = {
+                fadeIn()
             },
             exitTransition = {
-                slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+                fadeOut()
             },
             popEnterTransition = {
-                slideInHorizontally(initialOffsetX = { -it }) + fadeIn()
+                fadeIn()
             },
             popExitTransition = {
-                slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                fadeOut()
             }
         ) { backStackEntry ->
             val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
@@ -101,17 +90,18 @@ fun AppNavGraph(
 
         composable(
             route = Screen.Login.route,
-            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
-            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
-            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
-            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+            enterTransition = { fadeIn() },
+            exitTransition = { fadeOut() },
+            popEnterTransition = { fadeIn() },
+            popExitTransition = { fadeOut() }
         ) {
             LoginScreen(
                 navController = navController,
                 onRegister = { navController.navigate(Screen.Register.route) },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -119,17 +109,18 @@ fun AppNavGraph(
 
         composable(
             route = Screen.Register.route,
-            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
-            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
-            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
-            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+            enterTransition = { fadeIn() },
+            exitTransition = { fadeOut() },
+            popEnterTransition = { fadeIn() },
+            popExitTransition = { fadeOut() }
         ) {
             RegisterScreen(
                 navController = navController,
                 onLogin = { navController.navigate(Screen.Login.route) },
                 onRegisterSuccess = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Register.route) { inclusive = true }
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )

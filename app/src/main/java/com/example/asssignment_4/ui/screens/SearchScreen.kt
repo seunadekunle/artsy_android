@@ -6,16 +6,22 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -27,7 +33,9 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.asssignment_4.R
 import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.ui.components.SearchResultCard
 import com.example.asssignment_4.ui.navigation.Screen
+import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +44,11 @@ fun SearchScreen(
     navController: NavHostController,
     homeViewModel: HomeViewModel = hiltViewModel()
 ) {
-    val searchTerm by homeViewModel.searchTerm.collectAsState()
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val currentUser by authViewModel.currentUser.collectAsState()
+    var showMenu by remember { mutableStateOf(false) }
+    val isLoggedIn = currentUser != null
+
     val searchResults by homeViewModel.searchResults.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()
     val error by homeViewModel.error.collectAsState()
@@ -45,125 +57,89 @@ fun SearchScreen(
     
     var isSearchVisible by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
-    
+
+    var searchTerm by rememberSaveable { mutableStateOf("") }
+
+
     LaunchedEffect(isSearchVisible) {
         if (isSearchVisible) {
             focusRequester.requestFocus()
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(searchResults) { artist ->
-            SearchResultCard(
-                artist = artist,
-                onClick = {
-                    navController.navigate(
-                        Screen.ArtistDetail.createRoute(artist.id)
-                    )
-                }
-            )
-        }
+    // Trigger search when text changes
+    LaunchedEffect(searchTerm) {
+        homeViewModel.setSearchTerm(searchTerm)
     }
-}
 
-@Composable
-fun SearchResultCard(
-    artist: Artist,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-//    Log.d("SearchResultCard", "Artist: ${artist.name}, ImageUrl: ${artist.imageUrl}")
+    Scaffold(
+        topBar = {
+                TopAppBar(
+                    title = {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = LocalContentColor.current.copy(alpha = 0.75f))
+                                Spacer(modifier = Modifier.width(6.dp))
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.background),
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp
+                                Box(modifier = Modifier.weight(1f)) {
+                                    BasicTextField(
+                                        value = searchTerm,
+                                        onValueChange = {
+                                            searchTerm = it
+                                            if (it.isNotEmpty()) { homeViewModel.setSearchTerm(it) }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(start = 6.dp),
+                                        singleLine = true,
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.W500, textDecoration = TextDecoration.Underline, color = LocalContentColor.current),
+                                        cursorBrush = SolidColor(LocalContentColor.current)
+                                    )
+                                    if (searchTerm.isEmpty()) {
+                                        Text("Search artists…", fontSize = 22.sp, color = LocalContentColor.current.copy(alpha = 0.6f), modifier = Modifier.padding(start = 6.dp))
+                                    }
+                                }
 
-    ) {
-        // we'll fix the height to something banner‑ish
-        Box(modifier = Modifier.height(185.dp)) {
-            // 1) full‑size background image
-            if (artist.imageUrl == "/assets/shared/missing_image.png") {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(R.drawable.artsy_logo)
-                        .crossfade(true)
-                        .error(R.drawable.artsy_logo)
-                        .fallback(R.drawable.artsy_logo)
-                        .build(),
-                    contentDescription = "${artist.name} artwork",
-                    modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Fit
+                                IconButton(onClick = { homeViewModel.setSearchTerm(""); searchTerm = "" }) {
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = LocalContentColor.current.copy(alpha = 1f))
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
                 )
-            } else {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(artist.imageUrl)
-                        .crossfade(true)
-                        .error(R.drawable.artsy_logo)
-                        .fallback(R.drawable.artsy_logo)
-                        .build(),
-                    contentDescription = "${artist.name} artwork",
-                    modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop
+
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(searchResults) { artist ->
+                val isArtistFavorite = favouriteIds.contains(artist.id)
+                SearchResultCard(
+                    artist = artist,
+                    isLoggedIn = isLoggedIn,
+                    isFavorite = isArtistFavorite,
+                    onFavoriteClick = {
+                        if (isLoggedIn) {
+                            if (isArtistFavorite) {
+                                homeViewModel.removeFavorite(artist.id)
+                            } else {
+                                homeViewModel.addFavorite(artist.id)
+                            }
+                        }
+                    },
+                    onClick = {
+                        navController.navigate(
+                            Screen.ArtistDetail.createRoute(artist.id)
+                        )
+                    }
                 )
-            }
-
-
-            // 2) bottom overlay with the name and arrow
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-                    .padding(start = 8.dp, end = 16.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = artist.name,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Go to details",
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            
             }
         }
     }
-}
-
-
-private fun formatArtistInfo(nationality: String, birthday: String?): String {
-    val info = mutableListOf<String>()
-    info.add(nationality)
-    birthday?.let { info.add("Born $it") }
-    return info.joinToString(" • ")
 }
 
 @Preview(showBackground = true)

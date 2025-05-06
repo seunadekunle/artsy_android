@@ -4,19 +4,19 @@ import android.content.Context
 import com.example.asssignment_4.BuildConfig
 import com.example.asssignment_4.repository.ArtistRepository
 import com.example.asssignment_4.repository.AuthRepository
+import com.franmontiel.persistentcookiejar.PersistentCookieJar
+import com.franmontiel.persistentcookiejar.cache.SetCookieCache
+import com.franmontiel.persistentcookiejar.persistence.SharedPrefsCookiePersistor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import okhttp3.JavaNetCookieJar
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import okhttp3.CookieJar
-import java.net.CookieManager
-import java.net.CookiePolicy
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -28,15 +28,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideCookieJar(@ApplicationContext context: Context): CookieJar {
-        val cookieManager = CookieManager()
-        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL)
-        return JavaNetCookieJar(cookieManager)
+    fun provideCookieJar(@ApplicationContext context: Context): PersistentCookieJar {
+        return PersistentCookieJar(SetCookieCache(), SharedPrefsCookiePersistor(context))
     }
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(cookieJar: CookieJar): OkHttpClient {
+    fun provideOkHttpClient(cookieJar: PersistentCookieJar): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
@@ -77,9 +75,11 @@ object NetworkModule {
         return ArtistRepository(apiService)
     }
 
-    @Provides
-    @Singleton
-    fun provideAuthRepository(apiService: ApiService): AuthRepository {
-        return AuthRepository(apiService)
-    }
+    // Remove the conflicting @Provides for AuthRepository
+    // The binding is handled by @Binds in RepositoryModule.kt
+//    @Provides
+//    @Singleton
+//    fun provideAuthRepository(apiService: ApiService): AuthRepository {
+//        return AuthRepository(apiService)
+//    }
 }

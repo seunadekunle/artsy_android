@@ -3,17 +3,29 @@ package com.example.asssignment_4.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.asssignment_4.model.User
+import com.example.asssignment_4.model.LoginRequest
+import com.example.asssignment_4.model.RegisterRequest
 import com.example.asssignment_4.repository.AuthRepository
+import com.franmontiel.persistentcookiejar.PersistentCookieJar
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+sealed class AuthEvent {
+    data class Success(val message: String) : AuthEvent()
+    data class Failure(val message: String) : AuthEvent()
+}
+
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val cookieJar: PersistentCookieJar
 ) : ViewModel() {
 
     private val _currentUser = MutableStateFlow<User?>(null)
@@ -22,50 +34,142 @@ class AuthViewModel @Inject constructor(
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _authEvent = MutableSharedFlow<AuthEvent>()
+    val authEvent: SharedFlow<AuthEvent> = _authEvent.asSharedFlow()
+
     init {
-        checkLoginStatus() // Check login status when ViewModel is created
+        // Check session on init
+        checkLoginStatus()
     }
 
     fun checkLoginStatus() {
         viewModelScope.launch {
+            _isLoading.value = true
+            _authError.value = null
             try {
                 val response = authRepository.getProfile()
                 if (response.isSuccessful) {
                     _currentUser.value = response.body()
                     _authError.value = null
                 } else {
-                    // Handle non-successful responses, e.g., 401 Unauthorized means not logged in
                     _currentUser.value = null
-                     if (response.code() != 401) { // Don't show error just for not being logged in
-                         _authError.value = "Auth Check Failed: ${response.code()}"
-                     } else {
-                         _authError.value = null // Clear error if it was just 401
-                     }
+                    if (response.code() != 401) {
+                        _authError.value = "Auth Check Failed: ${response.code()}"
+                    } else {
+                        _authError.value = null
+                    }
                 }
             } catch (e: Exception) {
                 _currentUser.value = null
                 _authError.value = "Error checking login: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun loginUser(email: String, password: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _authError.value = null
+            try {
+                val response = authRepository.login(email, password)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _currentUser.value = response.body()?.user
+                    // PersistentCookieJar handles cookie persistence automatically
+                    _authEvent.emit(AuthEvent.Success("Logged in successfully"))
+                } else {
+                    val errorMsg = response.body()?.message ?: "Login failed: ${response.code()}"
+                    _authError.value = errorMsg
+                    _authEvent.emit(AuthEvent.Failure(errorMsg))
+                }
+            } catch (e: Exception) {
+                val errorMsg = "Login error: ${e.message}"
+                _authError.value = errorMsg
+                _authEvent.emit(AuthEvent.Failure(errorMsg))
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun registerUser(name: String, email: String, password: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _authError.value = null
+            try {
+                val response = authRepository.register(email, password, name)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _currentUser.value = response.body()?.user
+                    // PersistentCookieJar handles cookie persistence automatically
+                    _authEvent.emit(AuthEvent.Success("Registered successfully"))
+                } else {
+                    val errorMsg = response.body()?.message ?: "Registration failed: ${response.code()}"
+                    _authError.value = errorMsg
+                    _authEvent.emit(AuthEvent.Failure(errorMsg))
+                }
+            } catch (e: Exception) {
+                val errorMsg = "Registration error: ${e.message}"
+                _authError.value = errorMsg
+                _authEvent.emit(AuthEvent.Failure(errorMsg))
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
     fun logoutUser() {
         viewModelScope.launch {
+            _isLoading.value = true
+            _authError.value = null
             try {
                 val response = authRepository.logout()
-                if (response.isSuccessful || response.code() == 401) { // Treat 401 as successful logout
+                if (response.isSuccessful || response.code() == 401) { // Treat 401 as success if already logged out
                     _currentUser.value = null
                     _authError.value = null
-                    // Optionally clear cookies or other session data here if needed
+                    cookieJar.clearSession()
+                    _authEvent.emit(AuthEvent.Success("Logged out successfully"))
                 } else {
-                    _authError.value = "Logout Failed: ${response.code()}"
+                    val errorMsg = "Logout Failed: ${response.code()}"
+                    _authError.value = errorMsg
+                    _authEvent.emit(AuthEvent.Failure(errorMsg))
                 }
             } catch (e: Exception) {
-                _authError.value = "Error during logout: ${e.message}"
+                val errorMsg = "Error during logout: ${e.message}"
+                _authError.value = errorMsg
+                _authEvent.emit(AuthEvent.Failure(errorMsg))
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    // TODO: Add loginUser and registerUser functions if needed for login/register screens
-    // These would call authRepository.login/register and update _currentUser on success
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _authError.value = null
+            try {
+                // Assuming authRepository.deleteAccount() will be created
+                val response = authRepository.deleteAccount()
+                if (response.isSuccessful) {
+                    _currentUser.value = null
+                    cookieJar.clearSession()
+                    _authEvent.emit(AuthEvent.Success("Deleted user successfully"))
+                } else {
+                    val errorMsg = "Account deletion failed: ${response.code()} - ${response.message()}"
+                    _authError.value = errorMsg
+                    _authEvent.emit(AuthEvent.Failure(errorMsg))
+                }
+            } catch (e: Exception) {
+                val errorMsg = "Error deleting account: ${e.message}"
+                _authError.value = errorMsg
+                _authEvent.emit(AuthEvent.Failure(errorMsg))
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
 }

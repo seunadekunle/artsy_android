@@ -7,16 +7,19 @@ import retrofit2.http.*
 interface ApiService {
     // Auth endpoints
     @POST("/api/auth/login")
-    suspend fun login(@Body loginRequest: LoginRequest): Response<User>
+    suspend fun login(@Body loginRequest: LoginRequest): Response<AuthResponse>
 
     @POST("/api/auth/register")
-    suspend fun register(@Body registerRequest: RegisterRequest): Response<User>
+    suspend fun register(@Body registerRequest: RegisterRequest): Response<AuthResponse>
 
     @GET("/api/auth/me")
     suspend fun getProfile(): Response<User>
 
     @POST("/api/auth/logout")
     suspend fun logout(): Response<Unit>
+
+    @DELETE("/api/auth/me") // Endpoint for deleting the authenticated user's account
+    suspend fun deleteAccount(): Response<Unit>
 
     // Search
     @GET("/api/artists/search")
@@ -45,9 +48,14 @@ interface ApiService {
 
     @DELETE("/api/favourites")
     suspend fun removeFavourite(@Body favourite: FavouriteRequest): Response<Unit>
-}
 
-// --- Supporting request models (for login/register/favourite) ---
-data class LoginRequest(val email: String, val password: String)
-data class RegisterRequest(val fullName: String, val email: String, val password: String)
-data class FavouriteRequest(val artistId: String)
+    // Similar Artists
+    @GET("/api/artists/{id}/similar")
+    suspend fun getSimilarArtists(@Path("id") artistId: String): Response<List<Artist>>
+
+    @GET("/api/artists/{id}/similar")
+    suspend fun getSimilarArtists(
+        @Path("id") artistId: String,
+        @Header("Authorization") authToken: String
+    ): Response<List<Artist>>
+}
