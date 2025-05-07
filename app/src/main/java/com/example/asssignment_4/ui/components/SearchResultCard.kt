@@ -36,7 +36,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
+import coil.size.Size
 import com.example.asssignment_4.R
 import com.example.asssignment_4.model.Artist
 
@@ -59,19 +61,21 @@ fun SearchResultCard(
         tonalElevation = 2.dp
     ) {
         Box(modifier = Modifier.height(185.dp)) {
-            if (artist.imageUrl == "/assets/shared/missing_image.png") {
+            // Check if the image URL is missing or a placeholder
+            if (artist.imageUrl == null || artist.imageUrl.isBlank() || 
+                artist.imageUrl.contains("/assets/shared/missing_image.png")) {
+                // Use placeholder with Fit content scale
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(R.drawable.artsy_logo)
                         .crossfade(true)
-                        .error(R.drawable.artsy_logo)
-                        .fallback(R.drawable.artsy_logo)
                         .build(),
                     contentDescription = "${artist.name} artwork",
                     modifier = Modifier.matchParentSize(),
                     contentScale = ContentScale.Fit
                 )
             } else {
+                // Use the actual image URL with Crop content scale
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(artist.imageUrl)

@@ -102,7 +102,16 @@ fun HomeScreen(
         else -> null
     }
     
-    val isLoggedIn = authViewModel.isLoggedIn.collectAsState().value
+    // Fix isLoggedIn check to better determine actual login state
+    val isTokenPresent = authViewModel.isLoggedIn.collectAsState().value
+    // Only consider user logged in if we have both a token AND a valid user
+    val isLoggedIn = isTokenPresent && currentUser != null
+    
+    // Debug login state
+    LaunchedEffect(isTokenPresent, currentUser) {
+        Log.d("HomeScreen", "Login state: isTokenPresent=$isTokenPresent, currentUser=${currentUser != null}, final isLoggedIn=$isLoggedIn")
+    }
+    
     val focusManager = LocalFocusManager.current
 
     // Fix this debug effect
@@ -200,11 +209,22 @@ fun HomeScreen(
                                         }
                                     }
                                     is UserState.Success -> {
-                                        val user = (userState as UserState.Success).user
+                                         val user = (userState as UserState.Success).user
+                                        // Debug log the user avatar URL before loading
+                                        Log.d("HomeScreen", "Loading user profile image, avatar URL: '${user.avatarUrl}'")
+                                        
                                         IconButton(onClick = { showMenu = true }) {
+                                            // Use default URL if avatar is missing
+                                            val imageUrl = if (!user.avatarUrl.isNullOrBlank()) {
+                                                user.avatarUrl
+                                            } else {
+                                                Log.w("HomeScreen", "Using fallback avatar image")
+                                                "https://d32dm0rphc51dk.cloudfront.net/28zn9h0gSTJzP9RqXNIJhw/square.jpg"
+                                            }
+                                            
                                             AsyncImage(
                                                 model = ImageRequest.Builder(LocalContext.current)
-                                                    .data(user.avatarUrl)
+                                                    .data(imageUrl)
                                                     .crossfade(true)
                                                     .placeholder(R.drawable.ic_person_placeholder)
                                                     .error(R.drawable.ic_person_placeholder)
@@ -213,7 +233,9 @@ fun HomeScreen(
                                                 modifier = Modifier
                                                     .size(24.dp)
                                                     .clip(CircleShape),
-                                                contentScale = ContentScale.Crop
+                                                contentScale = ContentScale.Crop,
+                                                onSuccess = { Log.d("HomeScreen", "Profile image loaded successfully") },
+                                                onError = { Log.e("HomeScreen", "Error loading profile image: $it") }
                                             )
                                         }
                                         DropdownMenu(

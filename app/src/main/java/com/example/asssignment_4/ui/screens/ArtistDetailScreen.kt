@@ -52,7 +52,9 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import coil.request.ImageRequest
 import com.example.asssignment_4.ui.components.CategoryDialog
 import com.example.asssignment_4.ui.components.SearchResultCard
 import com.example.asssignment_4.ui.navigation.Screen
@@ -334,17 +336,47 @@ fun ArtistDetailScreen(
                                     Column { // Revert: Let Column naturally wrap content
                                         // Display artwork image if available
                                         val imageUrlTemplate = artwork.links?.image?.href ?: artwork.links?.thumbnail?.href
-                                        val imageUrl = imageUrlTemplate?.replace("{image_version}", "medium") // Replace placeholder
-
-                                        if (imageUrl != null && imageUrl != "/assets/shared/missing_image.png") {
+                                        val rawImageUrl = imageUrlTemplate?.replace("{image_version}", "medium") // Replace placeholder
+                                        
+                                        // Process the URL properly to ensure it loads
+                                        val imageUrl = when {
+                                            rawImageUrl == null || rawImageUrl == "/assets/shared/missing_image.png" -> {
+                                                // Missing image case
+                                                Log.d("ArtistDetailScreen", "Artwork ${artwork.id} has missing image URL")
+                                                null
+                                            }
+                                            rawImageUrl.startsWith("/") -> {
+                                                // Handle relative URLs by prepending the base URL
+                                                val fullUrl = "https://d32dm0rphc51dk.cloudfront.net${rawImageUrl}"
+                                                Log.d("ArtistDetailScreen", "Converting relative URL to absolute: ${rawImageUrl} -> $fullUrl")
+                                                fullUrl
+                                            }
+                                            !rawImageUrl.startsWith("http") -> {
+                                                // Any other non-http URL gets the same treatment
+                                                val fullUrl = "https://d32dm0rphc51dk.cloudfront.net/${rawImageUrl}"
+                                                Log.d("ArtistDetailScreen", "Converting non-http URL to absolute: ${rawImageUrl} -> $fullUrl")
+                                                fullUrl
+                                            }
+                                            else -> {
+                                                // Already a full URL, use as is
+                                                Log.d("ArtistDetailScreen", "Using full image URL for artwork ${artwork.id}: ${rawImageUrl}")
+                                                rawImageUrl
+                                            }
+                                        }
+                                        
+                                        if (imageUrl != null) {
                                             AsyncImage(
-                                                model = imageUrl,
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(imageUrl)
+                                                    .crossfade(true)
+                                                    .placeholder(R.drawable.artsy_logo)
+                                                    .error(R.drawable.artsy_logo)
+                                                    .build(),
                                                 contentDescription = artwork.title,
-                                                contentScale = ContentScale.FillWidth, // Scale to fill width, adjusting height
-                                                error = painterResource(id = R.drawable.artsy_logo),
-                                                placeholder = painterResource(id = R.drawable.artsy_logo),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
+                                                contentScale = ContentScale.FillWidth,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                onSuccess = { Log.d("ArtistDetailScreen", "Successfully loaded image for artwork ${artwork.id}") },
+                                                onError = { Log.e("ArtistDetailScreen", "Error loading image for artwork ${artwork.id}: $it") }
                                             )
                                         } else {
                                             // Display placeholder with colored background

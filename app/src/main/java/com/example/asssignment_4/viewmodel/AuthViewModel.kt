@@ -159,24 +159,50 @@ class AuthViewModel @Inject constructor(
             try {
                 Log.d("AuthViewModel", "Fetching user profile...")
                 val response = authRepository.getProfile()
+                Log.d("AuthViewModel", "Profile response code: ${response.code()}, isSuccessful: ${response.isSuccessful}")
+                
                 if (response.isSuccessful) {
                     val user = response.body()
                     Log.d("AuthViewModel", "Fetched profile: $user")
+                    
                     if (user != null) {
-                        Log.d("AuthViewModel", "User is not null, attempting to set _currentUser.value. User: $user")
-                        _currentUser.value = user
-                        _userState.value = UserState.Success(user)
-                        Log.d("AuthViewModel", "Updated currentUser.value = ${_currentUser.value}")
+                        // Debug log the specific fields we care about
+                        Log.d("AuthViewModel", "User details - id: ${user.id}, name: ${user.fullName}, email: ${user.email}")
+                        Log.d("AuthViewModel", "User avatar URL: '${user.avatarUrl}'")
+                        
+                        // Check if avatar URL is valid
+                        if (user.avatarUrl.isNullOrBlank()) {
+                            Log.w("AuthViewModel", "Avatar URL is null or blank! Creating copy with fallback URL")
+                            // Create a copy with a fallback avatar URL if missing
+                            val userWithAvatar = user.copy(
+                                avatarUrl = "https://d32dm0rphc51dk.cloudfront.net/28zn9h0gSTJzP9RqXNIJhw/square.jpg"
+                            )
+                            _currentUser.value = userWithAvatar
+                            _userState.value = UserState.Success(userWithAvatar)
+                        } else {
+                            _currentUser.value = user
+                            _userState.value = UserState.Success(user)
+                        }
+                        
+                        Log.d("AuthViewModel", "Updated state - currentUser.value: ${_currentUser.value}")
+                        Log.d("AuthViewModel", "Updated state - userState.value: ${_userState.value}")
                     } else {
                         Log.w("AuthViewModel", "User profile is null despite successful response")
                         _userState.value = UserState.Error("Profile data missing")
                     }
                 } else {
-                    Log.w("AuthViewModel", "Failed to fetch profile: ${response.code()}")
+                    Log.w("AuthViewModel", "Failed to fetch profile: ${response.code()}, message: ${response.message()}")
+                    try {
+                        val errorBody = response.errorBody()?.string()
+                        Log.w("AuthViewModel", "Error body: $errorBody")
+                    } catch (e: Exception) {
+                        Log.e("AuthViewModel", "Could not read error body: ${e.message}")
+                    }
                     _userState.value = UserState.Error("Failed to fetch profile: ${response.code()}")
                 }
             } catch (e: Exception) {
                 Log.e("AuthViewModel", "Error fetching profile: ${e.message}")
+                e.printStackTrace()
                 _userState.value = UserState.Error("Error fetching profile: ${e.message}")
             }
         }
