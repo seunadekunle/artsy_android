@@ -56,11 +56,12 @@ fun SearchResultCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(top = 12.dp),
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 2.dp
     ) {
-        Box(modifier = Modifier.height(185.dp)) {
+        Box(modifier = Modifier.height(190.dp)) {
             // Check if the image URL is missing or a placeholder
             if (artist.imageUrl == null || artist.imageUrl.isBlank() || 
                 artist.imageUrl.contains("/assets/shared/missing_image.png")) {

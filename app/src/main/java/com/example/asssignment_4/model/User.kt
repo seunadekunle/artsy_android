@@ -1,26 +1,19 @@
 package com.example.asssignment_4.model
 
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonNames
+import com.google.gson.annotations.SerializedName
 
-@OptIn(ExperimentalSerializationApi::class)
-@Serializable
 data class User(
-    @SerialName("_id")
-    @JsonNames("id")
+    @SerializedName("id")
     val id: String? = null,
 
-    @SerialName("fullname")
-    @JsonNames("fullName")
+    @SerializedName("fullname")
     val fullName: String? = null,
 
     val email: String? = null,
 
-    @SerialName("profileImageUrl")
-    @JsonNames("avatarUrl")
+    @SerializedName("profileImageUrl")
     val avatarUrl: String? = null,
 
+    @SerializedName("favorites")
     val favourites: List<String>? = null
 )

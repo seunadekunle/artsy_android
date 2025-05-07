@@ -13,6 +13,13 @@ interface ApiService {
     suspend fun register(@Body registerRequest: RegisterRequest): Response<AuthResponse>
 
     @GET("/api/auth/me")
+    suspend fun getProfile(
+        @Header("Authorization") authToken: String,
+        @Header("Accept") acceptType: String = "application/json"
+    ): Response<AuthResponse>
+    
+    // Overloaded version that will use the token from the interceptor if available
+    @GET("/api/auth/me")
     suspend fun getProfile(): Response<AuthResponse>
 
     @POST("/api/auth/logout")

@@ -99,42 +99,26 @@ class AuthViewModel @Inject constructor(
                     if (response.isSuccessful && response.body() != null) {
                         val user = response.body()
                         Log.d("AuthViewModel", "Profile response user: $user")
-                        Log.d("AuthViewModel", "User avatarUrl: ${user?.avatarUrl}, fullName: ${user?.fullName}")
                         
-                        // Enhanced debug for profile image URL issues
-                        if (user?.avatarUrl.isNullOrEmpty()) {
-                            Log.w("AuthViewModel", "Profile image URL is null or empty! Raw response: ${response.raw().body}")
-                        } else {
-                            Log.d("AuthViewModel", "Profile image URL found: ${user?.avatarUrl}")
-                        }
-                        
+                        // We found a valid cookie session
                         if (user != null) {
                             _currentUser.value = user
                             _userState.value = UserState.Success(user)
+                            Log.d("AuthViewModel", "Restored session from cookie")
                         } else {
+                            // User data is null, strange situation
                             _userState.value = UserState.NotLoggedIn
-                        }
-                        _authError.value = null
-                        viewModelScope.launch {
-                            authManager.emitAuthEvent(Success("Session restored"))
+                            _currentUser.value = null
+                            Log.d("AuthViewModel", "Auth status: Not logged in (no user data in profile response)")
                         }
                     } else {
-                        _currentUser.value = null
+                        // No valid cookie session
                         _userState.value = UserState.NotLoggedIn
-                        if (response.code() != 401) {
-                            val errorMsg = "Auth Check Failed: ${response.code()}"
-                            _authError.value = errorMsg
-                            _userState.value = UserState.Error(errorMsg)
-                            viewModelScope.launch {
-                                authManager.emitAuthEvent(Failure(errorMsg))
-                            }
-                        } else {
-                            // Clear session on 401
-                            _authError.value = null
-                            authManager.clearAuthState()
-                        }
+                        _currentUser.value = null
+                        Log.d("AuthViewModel", "Auth status: Not logged in (profile request failed)")
                     }
                 } else {
+                    // User manually logged out, respect that
                     Log.d("AuthViewModel", "User previously logged out manually, not attempting to restore session")
                     _currentUser.value = null
                     _userState.value = UserState.NotLoggedIn
@@ -155,55 +139,55 @@ class AuthViewModel @Inject constructor(
     
     private fun fetchUserProfile() {
         viewModelScope.launch {
-            _userState.value = UserState.Loading // Set loading state
+            _isLoading.value = true
+            _userState.value = UserState.Loading
+            
             try {
                 Log.d("AuthViewModel", "Fetching user profile...")
                 val response = authRepository.getProfile()
                 Log.d("AuthViewModel", "Profile response code: ${response.code()}, isSuccessful: ${response.isSuccessful}")
                 
-                if (response.isSuccessful) {
-                    val user = response.body()
-                    Log.d("AuthViewModel", "Fetched profile: $user")
+                if (response.isSuccessful && response.body() != null) {
+                    val userData = response.body()
+                    Log.d("AuthViewModel", "Fetched profile: $userData")
                     
-                    if (user != null) {
-                        // Debug log the specific fields we care about
-                        Log.d("AuthViewModel", "User details - id: ${user.id}, name: ${user.fullName}, email: ${user.email}")
-                        Log.d("AuthViewModel", "User avatar URL: '${user.avatarUrl}'")
+                    if (userData != null) {
+                        Log.d("AuthViewModel", "User details - id: ${userData.id}, name: ${userData.fullName}, email: ${userData.email}")
+                        Log.d("AuthViewModel", "User avatar URL: '${userData.avatarUrl}'")
                         
-                        // Check if avatar URL is valid
-                        if (user.avatarUrl.isNullOrBlank()) {
-                            Log.w("AuthViewModel", "Avatar URL is null or blank! Creating copy with fallback URL")
-                            // Create a copy with a fallback avatar URL if missing
-                            val userWithAvatar = user.copy(
-                                avatarUrl = "https://d32dm0rphc51dk.cloudfront.net/28zn9h0gSTJzP9RqXNIJhw/square.jpg"
-                            )
-                            _currentUser.value = userWithAvatar
-                            _userState.value = UserState.Success(userWithAvatar)
-                        } else {
-                            _currentUser.value = user
-                            _userState.value = UserState.Success(user)
-                        }
+                        // Update both state flows
+                        _currentUser.value = userData
+                        _userState.value = UserState.Success(userData)
                         
-                        Log.d("AuthViewModel", "Updated state - currentUser.value: ${_currentUser.value}")
                         Log.d("AuthViewModel", "Updated state - userState.value: ${_userState.value}")
-                    } else {
-                        Log.w("AuthViewModel", "User profile is null despite successful response")
-                        _userState.value = UserState.Error("Profile data missing")
+                        return@launch
                     }
-                } else {
-                    Log.w("AuthViewModel", "Failed to fetch profile: ${response.code()}, message: ${response.message()}")
-                    try {
-                        val errorBody = response.errorBody()?.string()
-                        Log.w("AuthViewModel", "Error body: $errorBody")
-                    } catch (e: Exception) {
-                        Log.e("AuthViewModel", "Could not read error body: ${e.message}")
-                    }
-                    _userState.value = UserState.Error("Failed to fetch profile: ${response.code()}")
                 }
+                
+                // Handle error cases
+                val errorMsg = when (response.code()) {
+                    401 -> {
+                        handleUnauthorized()
+                        "Session expired"
+                    }
+                    404 -> "User not found"
+                    500 -> "Server error"
+                    else -> response.errorBody()?.string() ?: "Unknown error"
+                }
+                
+                Log.w("AuthViewModel", "Failed to fetch profile: $errorMsg")
+                _userState.value = UserState.NotLoggedIn
+                _currentUser.value = null
+                _authError.value = errorMsg
+                
             } catch (e: Exception) {
                 Log.e("AuthViewModel", "Error fetching profile: ${e.message}")
                 e.printStackTrace()
-                _userState.value = UserState.Error("Error fetching profile: ${e.message}")
+                _userState.value = UserState.NotLoggedIn
+                _currentUser.value = null
+                _authError.value = e.message
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -216,28 +200,22 @@ class AuthViewModel @Inject constructor(
             try {
                 val response = authRepository.login(email, password)
                 if (response.isSuccessful && response.body()?.success == true) {
-                    val user = response.body()?.user
-                    val token = response.body()?.token
+                    val authData = response.body()
+                    val token = authData?.token
                     
-                    Log.d("AuthViewModel", "Login response user: $user")
-                    Log.d("AuthViewModel", "User avatarUrl: ${user?.avatarUrl}, fullName: ${user?.fullName}")
+                    // Get user from nested data structure
+                    val userData = authData?.data?.user
+                    Log.d("AuthViewModel", "Login response user: $userData")
+                    Log.d("AuthViewModel", "User avatarUrl: ${userData?.avatarUrl}, fullName: ${userData?.fullName}")
                     Log.d("AuthViewModel", "JWT Token received: ${token != null}")
-                    
-                    // Enhanced debug for profile image URL issues
-                    if (user?.avatarUrl.isNullOrEmpty()) {
-                        Log.w("AuthViewModel", "LOGIN: Profile image URL is null or empty!")
-                    } else {
-                        Log.d("AuthViewModel", "LOGIN: Profile image URL found: ${user?.avatarUrl}")
-                    }
                     
                     // Mark as logged in if we have a token, even if user is null
                     if (token != null) {
                         authManager.saveAuthToken(token)
                         
-                        // Set user if available, otherwise fetch profile
-                        if (user != null) {
-                            _currentUser.value = user
-                            _userState.value = UserState.Success(user)
+                        if (userData != null) {
+                            _currentUser.value = userData
+                            _userState.value = UserState.Success(userData)
                         } else {
                             // User data is null, try to fetch profile separately
                             Log.d("AuthViewModel", "User data is null in login response, fetching profile...")
@@ -248,6 +226,8 @@ class AuthViewModel @Inject constructor(
                         viewModelScope.launch {
                             authManager.emitAuthEvent(Success("Logged in successfully"))
                         }
+                        // Add delay before navigation
+                        kotlinx.coroutines.delay(1500)
                     } else {
                         // No token received - this shouldn't happen with success=true
                         Log.w("AuthViewModel", "Login successful but no token received")
@@ -257,8 +237,6 @@ class AuthViewModel @Inject constructor(
                             authManager.emitAuthEvent(Failure("Authentication error: No token received"))
                         }
                     }
-                    // Add delay before navigation
-                    kotlinx.coroutines.delay(1500)
                 } else {
                     val errorMsg = response.body()?.message ?: "Login failed: ${response.code()}"
                     _authError.value = errorMsg
@@ -279,7 +257,7 @@ class AuthViewModel @Inject constructor(
             }
         }
     }
-
+    
     fun registerUser(name: String, email: String, password: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -288,31 +266,24 @@ class AuthViewModel @Inject constructor(
             try {
                 val response = authRepository.register(email, password, name)
                 if (response.isSuccessful && response.body()?.success == true) {
-                    val user = response.body()?.user
-                    val token = response.body()?.token
+                    val authData = response.body()
+                    val token = authData?.token
+                    val userData = authData?.data?.user
                     
-                    Log.d("AuthViewModel", "Register response user: $user")
-                    Log.d("AuthViewModel", "User avatarUrl: ${user?.avatarUrl}, fullName: ${user?.fullName}")
+                    Log.d("AuthViewModel", "Registration response user: $userData")
                     Log.d("AuthViewModel", "JWT Token received: ${token != null}")
                     
-                    // Enhanced debug for profile image URL issues
-                    if (user?.avatarUrl.isNullOrEmpty()) {
-                        Log.w("AuthViewModel", "REGISTER: Profile image URL is null or empty!")
-                    } else {
-                        Log.d("AuthViewModel", "REGISTER: Profile image URL found: ${user?.avatarUrl}")
-                    }
-                    
-                    // Mark as logged in if we have a token, even if user is null
+                    // Mark as registered and logged in if we have a token
                     if (token != null) {
                         authManager.saveAuthToken(token)
                         
                         // Set user if available, otherwise fetch profile
-                        if (user != null) {
-                            _currentUser.value = user
-                            _userState.value = UserState.Success(user)
+                        if (userData != null) {
+                            _currentUser.value = userData
+                            _userState.value = UserState.Success(userData)
                         } else {
                             // User data is null, try to fetch profile separately
-                            Log.d("AuthViewModel", "User data is null in register response, fetching profile...")
+                            Log.d("AuthViewModel", "User data is null in registration response, fetching profile...")
                             fetchUserProfile()
                         }
                         
@@ -351,15 +322,15 @@ class AuthViewModel @Inject constructor(
             }
         }
     }
-
+    
     fun logoutUser() {
         viewModelScope.launch {
             _isLoading.value = true
             _authError.value = null
             try {
                 // The manuallyLoggedOut flag will be set by AuthManager.clearAuthState()
-                
                 val response = authRepository.logout()
+                
                 if (response.isSuccessful || response.code() == 401) { // Treat 401 as success if already logged out
                     _currentUser.value = null
                     _userState.value = UserState.NotLoggedIn

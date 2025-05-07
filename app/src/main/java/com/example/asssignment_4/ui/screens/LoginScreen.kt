@@ -227,15 +227,6 @@ fun LoginScreen(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            if (authErrorMessage != null) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = authErrorMessage!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,

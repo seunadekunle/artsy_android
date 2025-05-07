@@ -48,18 +48,22 @@ fun SearchScreen(
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
     
-    // Use new userState flow
-    val userState by authViewModel.userState.collectAsState()
-    val currentUser = when (val state = userState) {
-        is UserState.Success -> state.user
+    // Safely collect userState with a default value to prevent null issues
+    val userState = authViewModel.userState.collectAsState(initial = UserState.NotLoggedIn).value
+    val currentUser = when (userState) {
+        is UserState.Success -> userState.user
         else -> null
     }
     
     var showMenu by remember { mutableStateOf(false) }
-    val isLoggedIn = currentUser != null
-
+    // Get the token state safely
+    val isTokenPresent = authViewModel.isLoggedIn.collectAsState(initial = false).value
+    // Only consider user logged in if we have both a token AND a valid user
+    val isLoggedIn = isTokenPresent && currentUser != null
+    
+    // Use a more controlled debug log that won't throw exceptions
     LaunchedEffect(userState) {
-        Log.d("SearchScreen", "Current userState in SearchScreen UI = $userState")
+        Log.d("SearchScreen", "Current userState in SearchScreen UI = ${userState::class.simpleName}")
     }
 
     val searchResults by homeViewModel.searchResults.collectAsState()
@@ -140,8 +144,7 @@ fun SearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(start = 16.dp, end = 16.dp)
         ) {
             items(searchResults) { artist ->
                 val isArtistFavorite = favouriteIds.contains(artist.id)

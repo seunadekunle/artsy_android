@@ -16,6 +16,7 @@ class TokenManager @Inject constructor(@ApplicationContext context: Context) {
     companion object {
         private const val PREFS_NAME = "auth_prefs"
         private const val USER_TOKEN = "user_token"
+        private const val MANUAL_LOGOUT = "manual_logout"
     }
 
     /**
@@ -63,5 +64,26 @@ class TokenManager @Inject constructor(@ApplicationContext context: Context) {
         editor.remove(USER_TOKEN)
         editor.apply()
         Log.d("TokenManager", "JWT token cleared from preferences")
+    }
+    
+    /**
+     * Sets the manual logout state in preferences
+     * @param value Whether the user has manually logged out
+     */
+    fun setManualLogoutState(value: Boolean) {
+        val editor = prefs.edit()
+        editor.putBoolean(MANUAL_LOGOUT, value)
+        editor.apply()
+        Log.d("TokenManager", "Manual logout state set to: $value")
+    }
+    
+    /**
+     * Gets the manual logout state from preferences
+     * @return Whether the user has manually logged out
+     */
+    fun getManualLogoutState(): Boolean {
+        val state = prefs.getBoolean(MANUAL_LOGOUT, false)
+        Log.d("TokenManager", "Retrieved manual logout state: $state")
+        return state
     }
 }

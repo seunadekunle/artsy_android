@@ -50,12 +50,11 @@ class AuthManager @Inject constructor(
         val hasToken = tokenManager.getAuthToken() != null
         _isLoggedIn.value = hasToken
         
-        // If we have no token on start, assume a previous manual logout occurred
-        // This prevents automatic session restoration on app start
-        if (!hasToken) {
-            _manuallyLoggedOut.value = true
-            Log.d("AuthManager", "No token found on init, setting manuallyLoggedOut=true")
-        }
+        // Get manual logout state from SharedPreferences
+        val wasManuallyLoggedOut = tokenManager.getManualLogoutState()
+        _manuallyLoggedOut.value = wasManuallyLoggedOut
+        
+        Log.d("AuthManager", "Init auth state: hasToken=$hasToken, manuallyLoggedOut=$wasManuallyLoggedOut")
     }
     
     /**
@@ -84,6 +83,7 @@ class AuthManager @Inject constructor(
             tokenManager.saveAuthToken(token)
             _isLoggedIn.value = true
             _manuallyLoggedOut.value = false  // Reset manual logout flag on explicit login
+            tokenManager.setManualLogoutState(false) // Save to preferences
             Log.d("AuthManager", "Auth token saved, setting manuallyLoggedOut=false")
         }
     }
@@ -95,6 +95,7 @@ class AuthManager @Inject constructor(
         _isLoggedIn.value = false
         _manuallyLoggedOut.value = true
         tokenManager.clearAuthToken()
+        tokenManager.setManualLogoutState(true) // Save logout state to preferences
         cookieJar.clearSession()
         Log.d("AuthManager", "Auth state cleared, tokens removed, cookies cleared, manuallyLoggedOut=true")
     }

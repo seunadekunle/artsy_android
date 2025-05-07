@@ -95,15 +95,15 @@ fun HomeScreen(
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
     val detailedFavorites by homeViewModel.detailedFavorites.collectAsState()
     
-    // Add userState collection and keep currentUser for compatibility
-    val userState by authViewModel.userState.collectAsState()
-    val currentUser = when (val state = userState) {
-        is UserState.Success -> state.user
+    // Safely collect userState with a default value to prevent null issues
+    val userState = authViewModel.userState.collectAsState(initial = UserState.NotLoggedIn).value
+    val currentUser = when (userState) {
+        is UserState.Success -> userState.user
         else -> null
     }
     
     // Fix isLoggedIn check to better determine actual login state
-    val isTokenPresent = authViewModel.isLoggedIn.collectAsState().value
+    val isTokenPresent = authViewModel.isLoggedIn.collectAsState(initial = false).value
     // Only consider user logged in if we have both a token AND a valid user
     val isLoggedIn = isTokenPresent && currentUser != null
     
@@ -129,31 +129,42 @@ fun HomeScreen(
         homeViewModel.getFavorites()
     }
 
-    // This effect observes authentication events
+    // This effect observes authentication events but only shows messages if relevant
     LaunchedEffect(authViewModel) {
         authViewModel.authEvent.collect { event ->
+            // Only show auth-related messages if they're relevant to the current state
             when (event) {
                 is AuthManagerEvent.Success -> {
-                    val message = event.message
-                    snackbarHostState.showSnackbar(
-                        message = message,
-                        duration = SnackbarDuration.Short
-                    )
-                }
-                is AuthManagerEvent.Failure -> {
-                    val message = event.message
-                    snackbarHostState.showSnackbar(
-                        message = message,
-                        duration = SnackbarDuration.Short
-                    )
-                }
-                is AuthManagerEvent.SessionExpired -> {
-                    // Show session expired message
-                    scope.launch {
+                    // Only show success messages if we're logged in or it's a login-related message
+                    if (isTokenPresent || event.message.contains("logged in", ignoreCase = true) ||
+                        event.message.contains("registered", ignoreCase = true)) {
                         snackbarHostState.showSnackbar(
-                            message = "Session expired",
+                            message = event.message,
                             duration = SnackbarDuration.Short
                         )
+                    }
+                }
+                is AuthManagerEvent.Failure -> {
+                    // Only show error messages if they're login-related
+                    if (event.message.contains("login", ignoreCase = true) ||
+                        event.message.contains("auth", ignoreCase = true) ||
+                        event.message.contains("password", ignoreCase = true) ||
+                        event.message.contains("user", ignoreCase = true)) {
+                        snackbarHostState.showSnackbar(
+                            message = event.message,
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
+                is AuthManagerEvent.SessionExpired -> {
+                    // Only show session expired message if we previously had a token
+                    if (isTokenPresent) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = "Session expired",
+                                duration = SnackbarDuration.Short
+                            )
+                        }
                     }
                 }
             }
