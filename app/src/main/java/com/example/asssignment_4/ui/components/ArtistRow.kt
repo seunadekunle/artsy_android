@@ -11,24 +11,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButtonDefaults.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.asssignment_4.model.Artist
-import com.example.asssignment_4.ui.screens.formatArtistInfo
 
 @Composable
 fun ArtistRow(
     artist: Artist,
-    onClick: (Artist) -> Unit
+    onClick: (Artist) -> Unit,
+    onFavoriteToggle: ((String, Boolean) -> Unit)? = null
 ) {
 
-    val artistInfo =formatArtistInfo(artist = artist)
+    val artistInfo = formatFavoriteArtistInfo(artist = artist)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -58,7 +58,8 @@ fun ArtistRow(
             Text(
                 text = "34 seconds ago",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Normal
             )
             Spacer(modifier = Modifier.width(4.dp))
             Icon(
@@ -68,5 +69,37 @@ fun ArtistRow(
             )
         }
     }
-    Divider()  // optional divider between rows
+}
+
+fun formatFavoriteArtistInfo(artist: Artist?): String {
+    val details = mutableListOf<String?>()
+    val nationality = artist?.nationality
+    val birth = artist?.birthday
+
+    details.add(nationality ?: "")
+    details.add(birth ?: "")
+
+
+    return details.filterNotNull().joinToString(", ")
+}
+
+
+@Preview(showBackground = true)
+@Composable
+fun ArtistRowPreview() {
+    val artist = Artist(
+        id = "favorite.artistId",
+        name = "favorite.artistName",
+        nationality = "Spanish",
+        birthday = "1881",
+        deathday = null,
+        imageUrl = "favorite.artistImage",
+        biography = null,
+        isFavorite = true
+    )
+    ArtistRow(
+        artist = artist,
+        onClick = {},
+        onFavoriteToggle = { _, _ -> },
+    )
 }

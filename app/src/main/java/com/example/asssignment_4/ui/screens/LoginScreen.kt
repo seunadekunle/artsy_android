@@ -23,7 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.asssignment_4.ui.theme.artsyBlue
 import com.example.asssignment_4.ui.theme.lightArtsyBlue
 import com.example.asssignment_4.ui.theme.lightArtsyDarkBlue
-import com.example.asssignment_4.viewmodel.AuthEvent
+import com.example.asssignment_4.util.AuthManagerEvent
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -58,7 +58,7 @@ fun LoginScreen(
     LaunchedEffect(lifecycleOwner, authViewModel) {
         authViewModel.authEvent.collect { event ->
             when (event) {
-                is com.example.asssignment_4.viewmodel.AuthEvent.Success -> {
+                is AuthManagerEvent.Success -> {
                     scope.launch {
                         snackbarHostState.showSnackbar(
                             message = event.message,
@@ -67,10 +67,19 @@ fun LoginScreen(
                     }
                     onLoginSuccess()
                 }
-                is com.example.asssignment_4.viewmodel.AuthEvent.Failure -> {
+                is AuthManagerEvent.Failure -> {
                     scope.launch {
                         snackbarHostState.showSnackbar(
                             message = event.message,
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
+                is AuthManagerEvent.SessionExpired -> {
+                    // For login screen, we're already on the login screen, so just show a message
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "Your previous session has expired. Please log in again.",
                             duration = SnackbarDuration.Short
                         )
                     }

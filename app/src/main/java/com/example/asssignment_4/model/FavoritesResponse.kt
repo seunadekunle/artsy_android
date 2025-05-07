@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class FavouriteRequest(
-    @SerialName("artistId")
-    val artistId: String
+data class FavoritesResponse(
+    val success: Boolean,
+    val data: List<Artist>
 )

@@ -13,12 +13,12 @@ interface ApiService {
     suspend fun register(@Body registerRequest: RegisterRequest): Response<AuthResponse>
 
     @GET("/api/auth/me")
-    suspend fun getProfile(): Response<User>
+    suspend fun getProfile(): Response<AuthResponse>
 
     @POST("/api/auth/logout")
     suspend fun logout(): Response<Unit>
 
-    @DELETE("/api/auth/me") // Endpoint for deleting the authenticated user's account
+    @DELETE("/api/auth/me")
     suspend fun deleteAccount(): Response<Unit>
 
     // Search
@@ -39,15 +39,15 @@ interface ApiService {
     @GET("/api/artworks/{id}/categories")
     suspend fun getArtworkCategories(@Path("id") artworkId: String): Response<GenesResponse>
 
-    // Favourites
-    @GET("/api/favourites")
-    suspend fun getFavourites(): Response<List<Artist>>
+    // Favorites
+    @GET("/api/favorites/")
+    suspend fun getFavourites(): Response<List<Favorite>>
 
-    @POST("/api/favourites")
-    suspend fun addFavourite(@Body favourite: FavouriteRequest): Response<Unit>
+    @POST("/api/favorites/{artistId}")
+    suspend fun addFavourite(@Path("artistId") artistId: String): Response<Favorite>
 
-    @DELETE("/api/favourites")
-    suspend fun removeFavourite(@Body favourite: FavouriteRequest): Response<Unit>
+    @DELETE("/api/favorites/{artistId}")
+    suspend fun removeFavourite(@Path("artistId") artistId: String): Response<Map<String, String>>
 
     // Similar Artists
     @GET("/api/artists/{id}/similar")

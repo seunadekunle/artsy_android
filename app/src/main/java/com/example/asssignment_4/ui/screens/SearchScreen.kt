@@ -1,5 +1,6 @@
 package com.example.asssignment_4.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -37,6 +38,7 @@ import com.example.asssignment_4.ui.components.SearchResultCard
 import com.example.asssignment_4.ui.navigation.Screen
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
+import com.example.asssignment_4.viewmodel.UserState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,15 +47,27 @@ fun SearchScreen(
     homeViewModel: HomeViewModel = hiltViewModel()
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
-    val currentUser by authViewModel.currentUser.collectAsState()
+    
+    // Use new userState flow
+    val userState by authViewModel.userState.collectAsState()
+    val currentUser = when (val state = userState) {
+        is UserState.Success -> state.user
+        else -> null
+    }
+    
     var showMenu by remember { mutableStateOf(false) }
     val isLoggedIn = currentUser != null
+
+    LaunchedEffect(userState) {
+        Log.d("SearchScreen", "Current userState in SearchScreen UI = $userState")
+    }
 
     val searchResults by homeViewModel.searchResults.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()
     val error by homeViewModel.error.collectAsState()
     val favourites by homeViewModel.favourites.collectAsState()
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
+    val needsRefresh by homeViewModel.needsRefresh.collectAsState()
     
     var isSearchVisible by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
@@ -70,6 +84,19 @@ fun SearchScreen(
     // Trigger search when text changes
     LaunchedEffect(searchTerm) {
         homeViewModel.setSearchTerm(searchTerm)
+    }
+    
+    // This effect ensures the screen updates when returning from the detail screen
+    // It will refresh favorite statuses and artist data
+    LaunchedEffect(Unit) {
+        homeViewModel.refreshFavoriteStatuses()
+    }
+    
+    // This effect watches the needsRefresh flag and refreshes when needed
+    LaunchedEffect(needsRefresh) {
+        if (needsRefresh) {
+            homeViewModel.refreshFavoriteStatuses()
+        }
     }
 
     Scaffold(

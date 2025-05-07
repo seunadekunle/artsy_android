@@ -21,7 +21,7 @@ private val LightColors = lightColorScheme(
     onPrimary = Color.Black,
     onSecondary = Color.White,
     onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
+    onSurface = Color(0xFF000000),
 )
 
 // Define dark colors

@@ -18,8 +18,8 @@ class ArtistRepository @Inject constructor(private val api: ApiService) {
     suspend fun searchArtists(query: String): Response<SearchResponse> = api.searchArtists(query)
     suspend fun getArtistDetails(id: String) = api.getArtistDetails(id)
     suspend fun getFavourites() = api.getFavourites()
-    suspend fun addFavourite(artistId: String) = api.addFavourite(FavouriteRequest(artistId))
-    suspend fun removeFavourite(artistId: String) = api.removeFavourite(FavouriteRequest(artistId))
+    suspend fun addFavourite(artistId: String) = api.addFavourite(artistId)
+    suspend fun removeFavourite(artistId: String) = api.removeFavourite(artistId)
 
     // Add function to get artist details by ID (using new endpoint)
     suspend fun getArtistDetailsById(artistId: String): Artist? {

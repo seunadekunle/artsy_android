@@ -67,6 +67,7 @@ fun ArtistDetailScreen(
     paddingValues: PaddingValues
 ) {
 
+    // Effect for fetching artist data when screen is first displayed
     LaunchedEffect(artistId, authViewModel.currentUser.value) { // Keyed by currentUser to re-fetch on login/logout
         // Call the ViewModel function to fetch data
         if (artistId.isNotEmpty()) { // Ensure ID is valid before fetching
@@ -75,6 +76,16 @@ fun ArtistDetailScreen(
             if (authViewModel.currentUser.value != null) {
                 viewModel.fetchSimilarArtists(artistId = artistId, authToken = null) // Pass null, rely on cookie jar
             }
+        }
+    }
+    
+    // Effect that runs when leaving the screen to mark data for refresh
+    DisposableEffect(artistId) {
+        onDispose {
+            // Mark that favorites data needs refresh when navigating away from this screen
+            // This will ensure that any changes made here are reflected in other screens
+            viewModel.markNeedsRefresh()
+            Log.d("ArtistDetailScreen", "Marked data for refresh when leaving screen")
         }
     }
 
@@ -95,7 +106,7 @@ fun ArtistDetailScreen(
     
     // Check login status and favorites
     val currentUser = authViewModel.currentUser.collectAsState().value
-    val isLoggedIn = currentUser != null
+    val isLoggedIn = authViewModel.isLoggedIn.collectAsState().value
     val favouriteIds = viewModel.favouriteIds.collectAsState().value
     val isFavorite = artist?.id?.let { favouriteIds.contains(it) } ?: false
     val similarArtists = viewModel.similarArtists.collectAsState().value
@@ -427,7 +438,7 @@ fun ArtistDetailScreen(
                                     LazyColumn(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp),
+                                            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
                                         verticalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         items(similarArtists) { artist ->
@@ -438,11 +449,14 @@ fun ArtistDetailScreen(
                                                 onFavoriteClick = {
                                                     if (favouriteIds.contains(artist.id)) {
                                                         viewModel.removeFavorite(artist.id)
+                                                        viewModel.markNeedsRefresh()
                                                     } else {
                                                         viewModel.addFavorite(artist.id)
+                                                        viewModel.markNeedsRefresh()
                                                     }
                                                 },
                                                 onClick = {
+                                                    // Navigate to the artist detail screen
                                                     navController.navigate(
                                                         Screen.ArtistDetail.createRoute(artist.id)
                                                     )

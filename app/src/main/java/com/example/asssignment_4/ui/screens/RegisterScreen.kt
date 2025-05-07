@@ -24,7 +24,7 @@ import com.example.asssignment_4.ui.theme.artsyBlue
 import com.example.asssignment_4.ui.theme.artsyDarkBlue
 import com.example.asssignment_4.ui.theme.lightArtsyBlue
 import com.example.asssignment_4.ui.theme.lightArtsyDarkBlue
-import com.example.asssignment_4.viewmodel.AuthEvent
+import com.example.asssignment_4.util.AuthManagerEvent
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.material3.SnackbarHost
@@ -60,7 +60,7 @@ fun RegisterScreen(
     LaunchedEffect(lifecycleOwner, authViewModel) {
         authViewModel.authEvent.collect { event ->
             when (event) {
-                is com.example.asssignment_4.viewmodel.AuthEvent.Success -> {
+                is AuthManagerEvent.Success -> {
                     scope.launch {
                         snackbarHostState.showSnackbar(
                             message = event.message,
@@ -70,10 +70,21 @@ fun RegisterScreen(
                     onRegisterSuccess()
                 }
 
-                is com.example.asssignment_4.viewmodel.AuthEvent.Failure -> {
+                is AuthManagerEvent.Failure -> {
                     scope.launch {
                         snackbarHostState.showSnackbar(
                             message = event.message,
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
+                
+                is AuthManagerEvent.SessionExpired -> {
+                    // For register screen, we don't need to handle session expiration specially
+                    // since the user is already trying to create a new account
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "Your previous session has expired.",
                             duration = SnackbarDuration.Short
                         )
                     }

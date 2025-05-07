@@ -1,8 +1,10 @@
 package com.example.asssignment_4.model
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 // Import the shared Link classes
 
+@Serializable
 data class Artist(
     val id: String,
     val name: String,
@@ -11,10 +13,11 @@ data class Artist(
     val deathday: String? = null,
     val imageUrl: String? = null,
     val biography: String? = null,
-    @SerializedName("_links") val links: ArtistLinks? = null,
+    @SerialName("_links") val links: ArtistLinks? = null,
     var isFavorite: Boolean = false
 )
 
+@Serializable
 data class ArtistLinks(
     val thumbnail: Link? = null,
     val image: TemplatedLink? = null,

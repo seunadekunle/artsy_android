@@ -2,6 +2,7 @@ package com.example.asssignment_4.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -63,11 +65,18 @@ import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.asssignment_4.R
+import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.model.User
+import com.example.asssignment_4.ui.navigation.Screen
 import com.example.asssignment_4.ui.components.ArtistRow
 import com.example.asssignment_4.ui.components.SearchResultCard
-import com.example.asssignment_4.ui.navigation.Screen
+import com.example.asssignment_4.ui.theme.artsyBlue
+import com.example.asssignment_4.ui.theme.lightArtsyBlue
+import com.example.asssignment_4.util.AuthManagerEvent
+import com.example.asssignment_4.util.AuthManagerEvent.SessionExpired
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
+import com.example.asssignment_4.viewmodel.UserState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,38 +90,76 @@ fun HomeScreen(
     val searchResults by homeViewModel.searchResults.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()
     val error by homeViewModel.error.collectAsState()
+    val needsRefresh by homeViewModel.needsRefresh.collectAsState()
     val favourites by homeViewModel.favourites.collectAsState()
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
-    val currentUser by authViewModel.currentUser.collectAsState()
-    val authError by authViewModel.authError.collectAsState()
-
-    val isLoggedIn = currentUser != null
+    val detailedFavorites by homeViewModel.detailedFavorites.collectAsState()
+    
+    // Add userState collection and keep currentUser for compatibility
+    val userState by authViewModel.userState.collectAsState()
+    val currentUser = when (val state = userState) {
+        is UserState.Success -> state.user
+        else -> null
+    }
+    
+    val isLoggedIn = authViewModel.isLoggedIn.collectAsState().value
     val focusManager = LocalFocusManager.current
+
+    // Fix this debug effect
+    LaunchedEffect(userState) {
+        Log.d("HomeScreen", "Current userState in HomeScreen UI = $userState")
+    }
 
     var showMenu by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // Refresh favorites when login state changes
+    LaunchedEffect(isLoggedIn) {
+        Log.d("HomeScreen", "User logged in, refreshing favorites")
+        homeViewModel.getFavorites()
+    }
+
+    // This effect observes authentication events
     LaunchedEffect(authViewModel) {
         authViewModel.authEvent.collect { event ->
             when (event) {
-                is com.example.asssignment_4.viewmodel.AuthEvent.Success -> {
-                    scope.launch {
-                        snackbarHostState.showSnackbar(
-                            message = event.message,
-                            duration = SnackbarDuration.Short
-                        )
-                    }
+                is AuthManagerEvent.Success -> {
+                    val message = event.message
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        duration = SnackbarDuration.Short
+                    )
                 }
-                is com.example.asssignment_4.viewmodel.AuthEvent.Failure -> {
+                is AuthManagerEvent.Failure -> {
+                    val message = event.message
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is AuthManagerEvent.SessionExpired -> {
+                    // Show session expired message
                     scope.launch {
                         snackbarHostState.showSnackbar(
-                            message = event.message,
+                            message = "Session expired",
                             duration = SnackbarDuration.Short
                         )
                     }
                 }
             }
+        }
+    }
+    
+    // This effect ensures the screen updates when returning from other screens
+    LaunchedEffect(Unit) {
+        homeViewModel.refreshFavoriteStatuses()
+    }
+    
+    // This effect watches the needsRefresh flag and refreshes when needed
+    LaunchedEffect(needsRefresh) {
+        if (needsRefresh) {
+            homeViewModel.refreshFavoriteStatuses()
         }
     }
 
@@ -140,40 +187,65 @@ fun HomeScreen(
                         }
                         Box {
                             var showMenu by remember { mutableStateOf(false) }
-                            if (isLoggedIn && currentUser != null) {
-                                IconButton(onClick = { showMenu = true }) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(currentUser?.avatarUrl)
-                                            .crossfade(true)
-                                            .placeholder(R.drawable.ic_person_placeholder)
-                                            .error(R.drawable.ic_person_placeholder)
-                                            .build(),
-                                        contentDescription = "Profile",
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showMenu,
-                                    onDismissRequest = { showMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Logout", fontWeight = FontWeight.Medium) },
-                                        onClick = {
-                                            authViewModel.logoutUser()
-                                            showMenu = false
+                            if (isLoggedIn) {
+                                when (userState) {
+                                    is UserState.Loading -> {
+                                        // Show loading indicator for profile
+                                        IconButton(onClick = {}) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                strokeWidth = 2.dp
+                                            )
                                         }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Delete Account", fontWeight = FontWeight.Medium, color = Color.Red) },
-                                        onClick = {
-                                            authViewModel.deleteAccount()
-                                            showMenu = false
+                                    }
+                                    is UserState.Success -> {
+                                        val user = (userState as UserState.Success).user
+                                        IconButton(onClick = { showMenu = true }) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current)
+                                                    .data(user.avatarUrl)
+                                                    .crossfade(true)
+                                                    .placeholder(R.drawable.ic_person_placeholder)
+                                                    .error(R.drawable.ic_person_placeholder)
+                                                    .build(),
+                                                contentDescription = "Profile",
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .clip(CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
                                         }
-                                    )
+                                        DropdownMenu(
+                                            expanded = showMenu,
+                                            onDismissRequest = { showMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Logout", fontWeight = FontWeight.Medium) },
+                                                onClick = {
+                                                    authViewModel.logoutUser()
+                                                    showMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Delete Account", fontWeight = FontWeight.Medium, color = Color.Red) },
+                                                onClick = {
+                                                    authViewModel.deleteAccount()
+                                                    showMenu = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                    else -> {
+                                        // Error or not logged in state, show login icon
+                                        IconButton(onClick = { navController.navigate(Screen.Login.route) }) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Person,
+                                                contentDescription = "Profile",
+                                                tint = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        }
+                                    }
                                 }
                             } else {
                                 IconButton(onClick = { navController.navigate(Screen.Login.route) }) {
@@ -200,7 +272,7 @@ fun HomeScreen(
         ) {
             // Date
             Text(
-                text = "31 March 2025",
+                text = "31 March 2025",
                 style = MaterialTheme.typography.titleSmall,
                 color = Color(0xDF555555),
                 fontWeight = FontWeight.W500,
@@ -280,13 +352,38 @@ fun HomeScreen(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
+                                .padding(horizontal = 0.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(favourites, key = { it.id ?: "" }) { artist ->
-                                ArtistRow(artist = artist, onClick = { navController.navigate(
-                                    Screen.ArtistDetail.createRoute(artist.id)
-                                ) })
+                            items(favourites, key = { it.id }) { favorite ->
+                                // Find detailed artist info if available
+                                val detailedArtist = detailedFavorites.find { it.first.artistId == favorite.artistId }?.second
+                                
+                                val artist = Artist(
+                                    id = favorite.artistId,
+                                    name = favorite.artistName,
+                                    nationality = detailedArtist?.nationality,
+                                    birthday = detailedArtist?.birthday,
+                                    deathday = detailedArtist?.deathday,
+                                    imageUrl = favorite.artistImage,
+                                    biography = detailedArtist?.biography,
+                                    isFavorite = true
+                                )
+                                
+                                ArtistRow(
+                                    artist = artist, 
+                                    onClick = { 
+                                        navController.navigate(Screen.ArtistDetail.createRoute(artist.id))
+                                    },
+                                    onFavoriteToggle = { artistId, isFavorite ->
+                                        if (!isFavorite) {
+                                            // Remove from favorites
+                                            homeViewModel.removeFavorite(artistId)
+                                            // Mark that we need a refresh
+                                            homeViewModel.markNeedsRefresh()
+                                        }
+                                    }
+                                )
                             }
                         }
                     }
