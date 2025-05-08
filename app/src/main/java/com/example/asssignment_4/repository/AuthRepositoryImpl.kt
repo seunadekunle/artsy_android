@@ -179,7 +179,7 @@ class AuthRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 // If deletion was successful, clear the auth token
                 tokenManager.clearAuthToken()
-                android.util.Log.d("AuthRepositoryImpl", "Account deleted successfully")
+                android.util.Log.d("AuthRepositoryImpl", "Deleted user successfully")
             } else {
                 // Log the error
                 val errorBody = response.errorBody()?.string()

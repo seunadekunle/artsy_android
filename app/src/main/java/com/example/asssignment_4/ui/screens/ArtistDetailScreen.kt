@@ -151,7 +151,7 @@ fun ArtistDetailScreen(
     // Observe auth events for account deletion Snackbar
     LaunchedEffect(Unit) {
         authViewModel.authEvent.collect { event ->
-            if (event is AuthManagerEvent.Success && event.message.contains("Account deleted successfully", ignoreCase = true)) {
+            if (event is AuthManagerEvent.Success && event.message.contains("Deleted user successfully", ignoreCase = true)) {
                 scope.launch {
                     snackbarHostState.showSnackbar(
                         message = "Deleted user successfully",

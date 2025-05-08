@@ -64,8 +64,25 @@ class AuthManager @Inject constructor(
         if (!hasSessionExpiredEventFired) {
             Log.w("AuthManager", "Session expired, clearing auth state")
             _isLoggedIn.value = false
-            cookieJar.clearSession()
             tokenManager.clearAuthToken()
+            
+            // Clear all cookies to ensure server-side session is terminated
+            try {
+                cookieJar.clear()
+                Log.d("AuthManager", "Cookie jar completely cleared during unauthorized handling")
+            } catch (e: Exception) {
+                Log.e("AuthManager", "Error clearing cookie jar during unauthorized handling: ${e.message}")
+            }
+            
+            // Also clear the standard CookieManager as a fallback
+            try {
+                android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                android.webkit.CookieManager.getInstance().flush()
+                Log.d("AuthManager", "System CookieManager cleared during unauthorized handling")
+            } catch (e: Exception) {
+                Log.e("AuthManager", "Error clearing system cookies during unauthorized handling: ${e.message}")
+            }
+            
             _authEvent.emit(AuthManagerEvent.SessionExpired)
             hasSessionExpiredEventFired = true
             
@@ -96,7 +113,24 @@ class AuthManager @Inject constructor(
         _manuallyLoggedOut.value = true
         tokenManager.clearAuthToken()
         tokenManager.setManualLogoutState(true) // Save logout state to preferences
-        cookieJar.clearSession()
+        
+        // Clear all cookies to ensure server-side session is terminated
+        try {
+            cookieJar.clear()
+            Log.d("AuthManager", "Cookie jar completely cleared")
+        } catch (e: Exception) {
+            Log.e("AuthManager", "Error clearing cookie jar: ${e.message}")
+        }
+        
+        // Also clear the standard CookieManager as a fallback
+        try {
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+            android.webkit.CookieManager.getInstance().flush()
+            Log.d("AuthManager", "System CookieManager cleared")
+        } catch (e: Exception) {
+            Log.e("AuthManager", "Error clearing system cookies: ${e.message}")
+        }
+        
         Log.d("AuthManager", "Auth state cleared, tokens removed, cookies cleared, manuallyLoggedOut=true")
     }
     

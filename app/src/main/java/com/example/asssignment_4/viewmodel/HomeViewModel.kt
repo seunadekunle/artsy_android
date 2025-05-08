@@ -37,6 +37,8 @@ class HomeViewModel @Inject constructor(
     private val apiService: ApiService
 ) : ViewModel() {
 
+    private val artistDetailCache = mutableMapOf<String, Pair<Artist, Long>>()
+
     private val _searchTerm = MutableStateFlow("")
     val searchTerm: StateFlow<String> = _searchTerm.asStateFlow()
 
@@ -87,273 +89,9 @@ class HomeViewModel @Inject constructor(
     private val _snackbarMessage = MutableSharedFlow<String>()
     val snackbarMessage = _snackbarMessage.asSharedFlow()
 
-    fun fetchSimilarArtists(artistId: String, authToken: String?) {
-        viewModelScope.launch {
-            try {
-                _isDetailLoading.value = true
-                val response = artistRepository.getSimilarArtists(artistId, authToken)
-                if (response.isSuccessful) {
-                    val similarArtistsResponse = response.body()
-                    if (similarArtistsResponse != null) {
-                        _similarArtists.value = similarArtistsResponse.artists
-                    } else {
-                        _similarArtists.value = emptyList()
-                        _detailError.value = "No similar artists found"
-                    }
-                } else {
-                    _detailError.value = "Failed to fetch similar artists: ${response.code()}"
-                }
-            } catch (e: Exception) {
-                Log.e("HomeViewModel", "Error fetching similar artists: ${e.message}")
-                _detailError.value = "Error loading similar artists: ${e.message}"
-                _similarArtists.value = emptyList()
-            } finally {
-                _isDetailLoading.value = false
-            }
-        }
-    }
-    
-    // Artwork Categories State
+    // For artwork categories (genes)
     private val _artworkCategories = MutableStateFlow<Map<String, List<Gene>>>(emptyMap())
-    val artworkCategories: StateFlow<Map<String, List<Gene>>> = _artworkCategories.asStateFlow()
-    // ----------------------------------------
-
-    // Debounce search term changes
-    @OptIn(FlowPreview::class)
-    fun setSearchTerm(term: String) {
-        _searchTerm.value = term
-        // Clear previous results immediately if search term is short
-        if (term.length < 3) {
-             _searchResults.value = emptyList()
-             _error.value = null // Clear error too
-             _isLoading.value = false // Stop loading indicator
-             return // Don't trigger search yet
-        }
-
-        viewModelScope.launch {
-            try {
-                // Call API and update results
-                _isLoading.value = true
-                try {
-                    val response = artistRepository.searchArtists(term)
-                    if (response.isSuccessful) {
-                        val searchResponse = response.body()
-                        if (searchResponse != null) {
-                            // Convert SearchResult to Artist objects
-                            _searchResults.value = searchResponse._embedded.results.map { result ->
-                                val artistId = result.links.self.href.split("/").last()
-                                val imageUrl = if (result.links.thumbnail.href == "/assets/shared/missing_image.png") {
-                                    null // Use a default placeholder in UI instead
-                                } else {
-                                    result.links.thumbnail.href
-                                }
-                                
-                                // Create links object
-                                val artistLinks = ArtistLinks(
-                                    self = Link(href = result.links.self.href),
-                                    permalink = Link(href = result.links.permalink.href),
-                                    thumbnail = Link(href = result.links.thumbnail.href)
-                                )
-                                
-                                Artist(
-                                    id = artistId,
-                                    name = result.title,
-                                    imageUrl = imageUrl,
-                                    nationality = null,
-                                    birthday = null,
-                                    deathday = null,
-                                    biography = result.description,
-                                    links = artistLinks,
-                                    isFavorite = _favouriteIds.value.contains(artistId)
-                                )
-                            }
-                        } else {
-                            _searchResults.value = emptyList()
-                        }
-                    } else {
-                        _error.value = "Failed to search artists"
-                    }
-                } catch (e: Exception) {
-                    _error.value = e.message ?: "An error occurred"
-                } finally {
-                    _isLoading.value = false
-                }
-            } catch (e: Exception) {
-                _error.value = e.message ?: "An error occurred"
-            }
-        }
-    }
-
-    fun setError(message: String) {
-        _error.value = message
-    }
     
-    /**
-     * Clears the search results and resets the search state
-     */
-    fun clearSearchResults() {
-        _searchResults.value = emptyList()
-        _error.value = null
-        _isLoading.value = false
-    }
-
-    // --- Function to fetch artist details and artworks ---
-    fun fetchArtistDetailsAndArtworks(artistId: String) {
-        viewModelScope.launch {
-            _isDetailLoading.value = true
-            _detailError.value = null
-            _artistDetail.value = null // Clear previous data
-            _artistArtworks.value = emptyList() // Clear previous data
-
-            try {
-                // Fetch details and artworks concurrently (or sequentially if needed)
-                // For simplicity, fetching sequentially here
-                val artistResponse = artistRepository.getArtistDetailsById(artistId)
-                _artistDetail.value = artistResponse
-
-                val artworksResponse = artistRepository.getArtistArtworks(artistId)
-                // Extract the list from the nested structure, handle potential nulls
-                _artistArtworks.value = artworksResponse.embedded?.artworks ?: emptyList()
-
-            } catch (e: IOException) {
-                _detailError.value = "Network error fetching details. Please check connection."
-                _artistDetail.value = null
-                _artistArtworks.value = emptyList()
-            } catch (e: Exception) {
-                _detailError.value = "Error fetching details: ${e.message ?: "Unknown error"}"
-                _artistDetail.value = null
-                _artistArtworks.value = emptyList()
-            } finally {
-                _isDetailLoading.value = false
-            }
-        }
-    }
-    // ----------------------------------------------------
-
-    // State-clearing function
-    fun clearState() {
-        _searchResults.value = emptyList()
-        _error.value = null
-        _artistDetail.value = null
-        _artistArtworks.value = emptyList()
-        _detailError.value = null
-        _similarArtists.value = emptyList()
-    }
-    
-    /**
-     * Call this function when returning to screens that show favorites or artists
-     * to ensure the UI reflects the latest favorite status changes
-     */
-    fun refreshFavoriteStatuses() {
-        viewModelScope.launch {
-            Log.d("HomeViewModel", "Refreshing favorite statuses")
-            _needsRefresh.value = false
-            
-            // Refresh favorites from API
-            getFavorites()
-            
-            // Then update all artists with current favorite status
-            updateAllArtistsFavoriteStatus()
-            
-            // Fetch detailed information for favorites
-            fetchFavoritesDetails()
-        }
-    }
-    
-    /**
-     * Fetch detailed artist information for each favorite
-     */
-    suspend fun fetchFavoritesDetails() {
-        try {
-            val favorites = _favourites.value
-            
-            // Use async to fetch artist details in parallel
-            val deferredArtists = favorites.map { favorite ->
-                viewModelScope.async(Dispatchers.IO) {
-                    try {
-                        val response = artistRepository.getArtistDetailsById(favorite.artistId)
-                        if (response != null) {
-                            Pair(favorite, response)
-                        } else {
-                            Log.e("HomeViewModel", "No artist details found for ${favorite.artistId}")
-                            null
-                        }
-                    } catch (e: Exception) {
-                        Log.e("HomeViewModel", "Error fetching artist: ${e.message}")
-                        null
-                    }
-                }
-            }
-
-            // Await all results and filter out nulls
-            val results = deferredArtists.awaitAll().filterNotNull()
-            _detailedFavorites.value = results
-            Log.d("HomeViewModel", "Updated detailed favorites list with ${results.size} items")
-        } catch (e: Exception) {
-            Log.e("HomeViewModel", "Error fetching favorite details: ${e.message}")
-        }
-    }
-    
-    /**
-     * Mark that favorite data needs refreshing (call this when changing favorite status)
-     */
-    fun markNeedsRefresh() {
-        _needsRefresh.value = true
-    }
-
-    // --- Function to clear artist detail state --- 
-    fun clearArtistDetails() {
-        _artistDetail.value = null
-        _artistArtworks.value = emptyList()
-        _detailError.value = null
-        _isDetailLoading.value = false
-        _artworkCategories.value = emptyMap()
-        _similarArtists.value = emptyList()
-    }
-    
-    /**
-     * Fetches categories for a specific artwork
-     * @param artworkId The ID of the artwork to fetch categories for
-     */
-    fun fetchArtworkCategories(artworkId: String) {
-        viewModelScope.launch {
-            try {
-                android.util.Log.d("HomeViewModel", "Starting to fetch categories for artwork: $artworkId")
-                
-                // Check if we already have categories for this artwork
-                if (_artworkCategories.value.containsKey(artworkId)) {
-                    android.util.Log.d("HomeViewModel", "Categories already cached for artwork: $artworkId")
-                    return@launch // Skip if already fetched
-                }
-                
-                android.util.Log.d("HomeViewModel", "Calling repository for categories for artwork: $artworkId")
-                val categories = artistRepository.getArtworkCategories(artworkId)
-                android.util.Log.d("HomeViewModel", "Retrieved ${categories.size} categories for artwork: $artworkId")
-                
-                // Update the map with new categories
-                val updatedMap = _artworkCategories.value.toMutableMap()
-                updatedMap[artworkId] = categories
-                _artworkCategories.value = updatedMap
-                
-                android.util.Log.d("HomeViewModel", "Updated categories state with ${categories.size} categories for artwork: $artworkId")
-                
-            } catch (e: Exception) {
-                // Log error but don't update global error state to avoid disrupting the UI
-                android.util.Log.e("HomeViewModel", "Error fetching categories for artwork $artworkId: ${e.message}", e)
-            }
-        }
-    }
-    
-    /**
-     * Gets categories for a specific artwork from the cached state
-     * @param artworkId The ID of the artwork to get categories for
-     * @return List of Gene objects representing categories, or empty list if none found
-     */
-    fun getArtworkCategories(artworkId: String): List<Gene> {
-        return _artworkCategories.value[artworkId] ?: emptyList()
-    }
-    // --------------------------------------------
-
     init {
         // Load favourites on init
         getFavorites()
@@ -377,17 +115,302 @@ class HomeViewModel @Inject constructor(
         startAutoRefreshDetailedFavorites()
     }
 
-    fun startAutoRefreshDetailedFavorites() {
+    fun fetchSimilarArtists(artistId: String, authToken: String?) {
         viewModelScope.launch {
-            if (authManager.isLoggedIn.value) {
-                // Run in a separate coroutine to avoid blocking UI
-                launch {
+            try {
+                _isDetailLoading.value = true
+                val response = artistRepository.getSimilarArtists(artistId, authToken)
+                if (response.isSuccessful) {
+                    val similarArtists = response.body()?.artists ?: emptyList()
+                    
+                    // Update favorite status for all similar artists
+                    val updatedSimilarArtists = similarArtists.map { artist ->
+                        artist.copy(isFavorite = _favouriteIds.value.contains(artist.id))
+                    }
+                    
+                    _similarArtists.value = updatedSimilarArtists
+                } else {
+                    _error.value = "Failed to load similar artists: ${response.code()}"
+                }
+                
+                _isDetailLoading.value = false
+                
+            } catch (e: Exception) {
+                _isDetailLoading.value = false
+                _error.value = "Error loading similar artists: ${e.message}"
+            }
+        }
+    }
+
+    @OptIn(FlowPreview::class)
+    fun setSearchTerm(term: String) {
+        _searchTerm.value = term
+        
+        if (term.isEmpty()) {
+            clearSearchResults()
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                
+                // Wait a bit to avoid excessive API calls while typing
+                delay(400)
+                
+                // If the term has changed since we started the delay, abort
+                if (term != _searchTerm.value) {
+                    return@launch
+                }
+                
+                val response = artistRepository.searchArtists(_searchTerm.value)
+                if (response.isSuccessful) {
+                    val searchResponse = response.body()
+                    // Extract artists from the search response structure
+                    // The actual structure depends on your API, adjust as needed
+                    val results = searchResponse?._embedded?.results ?: emptyList()
+                    
+                    // Convert search results to Artist objects
+                    val artists = results.mapNotNull { result ->
+                        // This conversion depends on your actual model structure
+                        // You may need to adjust this based on your API response
+                        try {
+                            Artist(
+                                id = result.links.permalink.href.substringAfterLast("/"),
+                                name = result.title,
+                                biography = result.description,
+                                imageUrl = result.links.thumbnail.href
+                            )
+                        } catch (e: Exception) {
+                            Log.e("HomeViewModel", "Error converting search result to artist: ${e.message}")
+                            null
+                        }
+                    }
+                    
+                    // Update isFavorite state based on current favorite IDs
+                    val updatedArtists = artists.map { artist ->
+                        artist.copy(isFavorite = _favouriteIds.value.contains(artist.id))
+                    }
+                    
+                    _searchResults.value = updatedArtists
+                } else {
+                    _error.value = "Search failed: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _error.value = "Search error: ${e.message}"
+                Log.e("HomeViewModel", "Search error: ${e.message}", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun setError(message: String) {
+        _error.value = message
+    }
+
+    fun clearSearchResults() {
+        _searchResults.value = emptyList()
+        _error.value = null
+        _isLoading.value = false
+    }
+
+    fun fetchArtistDetailsAndArtworks(artistId: String) {
+        viewModelScope.launch {
+            try {
+                _isDetailLoading.value = true
+                _detailError.value = null
+                
+                // Fetch from cache if available
+                val cachedArtist = artistDetailCache[artistId]?.first
+                if (cachedArtist != null) {
+                    Log.d("HomeViewModel", "Using cached artist details for $artistId")
+                    _artistDetail.value = cachedArtist
+                    fetchSimilarArtists(artistId, authManager.getAuthToken())
+                    return@launch
+                }
+                
+                val response = artistRepository.getArtistDetailsById(artistId)
+                if (response != null) {
+                    // Update with favorite status
+                    val isFavorite = _favouriteIds.value.contains(response.id)
+                    _artistDetail.value = response.copy(isFavorite = isFavorite)
+                    
+                    // Fetch artworks for this artist
                     try {
-                        fetchFavoritesDetails()
+                        val artworksResponse = artistRepository.getArtistArtworks(artistId)
+                        // Extract artworks from the embedded structure
+                        _artistArtworks.value = artworksResponse.embedded?.artworks ?: emptyList()
                     } catch (e: Exception) {
-                        Log.e("HomeViewModel", "Error refreshing favorites: ${e.message}")
+                        Log.e("HomeViewModel", "Error fetching artworks: ${e.message}", e)
+                        _artistArtworks.value = emptyList()
+                    }
+                    
+                    // Fetch similar artists
+                    fetchSimilarArtists(artistId, authManager.getAuthToken())
+                } else {
+                    _detailError.value = "Failed to load artist details"
+                }
+            } catch (e: Exception) {
+                _detailError.value = "Error: ${e.message}"
+                Log.e("HomeViewModel", "Error fetching artist details: ${e.message}", e)
+            } finally {
+                _isDetailLoading.value = false
+            }
+        }
+    }
+
+    fun clearState() {
+        _searchResults.value = emptyList()
+        _artistDetail.value = null
+        _artistArtworks.value = emptyList()
+        _similarArtists.value = emptyList()
+        _error.value = null
+        _detailError.value = null
+    }
+
+    fun refreshFavoriteStatuses() {
+        viewModelScope.launch {
+            try {
+                Log.d("HomeViewModel", "Refreshing favorite statuses...")
+                val favoritesResult = artistRepository.getFavourites()
+                if (favoritesResult.isSuccessful) {
+                    val favorites = favoritesResult.body() ?: emptyList()
+                    _favourites.value = favorites
+                    _favouriteIds.value = favorites.map { it.artistId }.toSet()
+                    
+                    Log.d("HomeViewModel", "Favorites updated, count: ${favorites.size}")
+                    
+                    // Update the isFavorite field in all current lists
+                    updateAllArtistsFavoriteStatus()
+                } else {
+                    Log.e("HomeViewModel", "Failed to refresh favorites: ${favoritesResult.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error refreshing favorites: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun fetchFavoritesDetails() {
+        if (_favourites.value.isEmpty()) {
+            Log.d("HomeViewModel", "No favorites to fetch details for")
+            _detailedFavorites.value = emptyList()
+            return
+        }
+        
+        try {
+            Log.d("HomeViewModel", "Fetching details for ${_favourites.value.size} favorites")
+            
+            val currentTime = System.currentTimeMillis()
+            val cacheExpiry = 5 * 60 * 1000 // 5 minutes in milliseconds
+            
+            // Results list to be built
+            val detailedFavorites = mutableListOf<Pair<Favorite, Artist?>>()
+            
+            // Favorites that need details to be fetched
+            val favoritesToFetch = mutableListOf<Favorite>()
+            
+            // First, use cache where available
+            for (favorite in _favourites.value) {
+                val cached = artistDetailCache[favorite.artistId]
+                
+                if (cached != null && (currentTime - cached.second < cacheExpiry)) {
+                    // Cache hit - use cached artist detail
+                    Log.d("HomeViewModel", "Cache hit for artist ${favorite.artistId}")
+                    detailedFavorites.add(Pair(favorite, cached.first))
+                } else {
+                    // Cache miss - need to fetch
+                    favoritesToFetch.add(favorite)
+                }
+            }
+            
+            Log.d("HomeViewModel", "Cache hits: ${detailedFavorites.size}, misses: ${favoritesToFetch.size}")
+            
+            // Fetch details for all cache misses in parallel
+            if (favoritesToFetch.isNotEmpty()) {
+                val fetchedDetails = favoritesToFetch.map { favorite ->
+                    try {
+                        Log.d("HomeViewModel", "Fetching details for favorite: ${favorite.artistId}")
+                        val artist = artistRepository.getArtistDetailsById(favorite.artistId)
+                        if (artist != null) {
+                            // Cache the result
+                            artistDetailCache[favorite.artistId] = Pair(artist, currentTime)
+                        }
+                        Pair(favorite, artist)
+                    } catch (e: Exception) {
+                        Log.e("HomeViewModel", "Error fetching artist details: ${e.message}")
+                        Pair(favorite, null)
                     }
                 }
+                detailedFavorites.addAll(fetchedDetails)
+            }
+            
+            // Update the state with all detailed favorites
+            _detailedFavorites.value = detailedFavorites
+            Log.d("HomeViewModel", "Detailed favorites updated, count: ${detailedFavorites.size}")
+            
+            // Reset the refresh flag
+            _needsRefresh.value = false
+            
+        } catch (e: Exception) {
+            Log.e("HomeViewModel", "Error in fetchFavoritesDetails: ${e.message}")
+        }
+    }
+
+    fun markNeedsRefresh() {
+        _needsRefresh.value = true
+    }
+
+    fun clearArtistDetails() {
+        _artistDetail.value = null
+        _artistArtworks.value = emptyList()
+        _similarArtists.value = emptyList()
+        _isDetailLoading.value = false
+        _detailError.value = null
+    }
+
+    fun fetchArtworkCategories(artworkId: String) {
+        viewModelScope.launch {
+            try {
+                // Avoid fetching if already cached
+                if (_artworkCategories.value.containsKey(artworkId)) {
+                    android.util.Log.d("HomeViewModel", "Categories already cached for artwork: $artworkId")
+                    return@launch // Skip if already fetched
+                }
+                
+                android.util.Log.d("HomeViewModel", "Calling repository for categories for artwork: $artworkId")
+                val categories = artistRepository.getArtworkCategories(artworkId)
+                android.util.Log.d("HomeViewModel", "Retrieved ${categories.size} categories for artwork: $artworkId")
+                
+                // Update the map with new categories
+                val updatedMap = _artworkCategories.value.toMutableMap()
+                updatedMap[artworkId] = categories
+                _artworkCategories.value = updatedMap
+                
+                android.util.Log.d("HomeViewModel", "Updated categories state with ${categories.size} categories for artwork: $artworkId")
+                
+            } catch (e: Exception) {
+                // Log error but don't update global error state to avoid disrupting the UI
+                android.util.Log.e("HomeViewModel", "Error fetching categories for artwork $artworkId: ${e.message}", e)
+            }
+        }
+    }
+    
+    fun getArtworkCategories(artworkId: String): List<Gene> {
+        return _artworkCategories.value[artworkId] ?: emptyList()
+    }
+
+    fun startAutoRefreshDetailedFavorites() {
+        viewModelScope.launch {
+            while (isActive) {
+                if (_needsRefresh.value) {
+                    Log.d("HomeViewModel", "Auto-refreshing favorite details")
+                    fetchFavoritesDetails()
+                }
+                
+                // Check again after delay
+                delay(10000) // 10 seconds
             }
         }
     }
@@ -395,37 +418,30 @@ class HomeViewModel @Inject constructor(
     fun getFavorites() {
         viewModelScope.launch {
             try {
-                Log.d("HomeViewModel", "Loading favorites...")
-                val response = apiService.getFavourites()
+                val response = artistRepository.getFavourites()
                 if (response.isSuccessful) {
                     val favorites = response.body() ?: emptyList()
                     _favourites.value = favorites
                     _favouriteIds.value = favorites.map { it.artistId }.toSet()
-                    Log.d("HomeViewModel", "Loaded ${favorites.size} favorites: ${favorites.map { it.artistId }}")
-                    Log.d("HomeViewModel", "Updated favorite IDs: ${_favouriteIds.value}")
                     
-                    // Update isFavorited property in all artist lists
+                    Log.d("HomeViewModel", "Favorites loaded, count: ${favorites.size}")
+                    
+                    // Make sure favorite status is consistently reflected in all lists
                     updateAllArtistsFavoriteStatus()
-                } else {
-                    val statusCode = response.code()
-                    Log.e("HomeViewModel", "Failed to load favorites: $statusCode")
                     
-                    if (statusCode == 401) {
-                        // Token expired or invalid, notify auth system
-                        Log.w("HomeViewModel", "Unauthorized (401) when loading favorites - token may be expired")
+                    // Mark that we need to refresh detailed information
+                    markNeedsRefresh()
+                } else {
+                    Log.e("HomeViewModel", "Failed to load favorites: ${response.code()}")
+                    
+                    if (response.code() == 401) {
                         viewModelScope.launch {
                             authManager.handleUnauthorized()
                         }
-                        // Clear favorites since we're not authorized
-                        _favourites.value = emptyList()
-                        _favouriteIds.value = emptySet()
-                    } else {
-                        _error.value = "Failed to load favourites: $statusCode"
                     }
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error loading favorites: ${e.message}")
-                _error.value = "Error loading favourites: ${e.message}"
             }
         }
     }
@@ -433,42 +449,50 @@ class HomeViewModel @Inject constructor(
     fun addFavorite(artistId: String) {
         viewModelScope.launch {
             try {
-                Log.d("HomeViewModel", "Adding favorite: $artistId")
                 val response = artistRepository.addFavourite(artistId)
                 if (response.isSuccessful) {
                     response.body()?.let { favorite ->
                         // Update local state immediately
-                        _favourites.value = _favourites.value + favorite
-                        _favouriteIds.value = _favouriteIds.value + favorite.artistId
-                        Log.d("HomeViewModel", "Successfully added favorite: ${favorite.artistId}")
+                        val updatedFavorites = _favourites.value.toMutableList().apply {
+                            add(favorite)
+                        }
+                        _favourites.value = updatedFavorites
                         
+                        val updatedIds = _favouriteIds.value.toMutableSet().apply {
+                            add(favorite.artistId)
+                        }
+                        _favouriteIds.value = updatedIds
+                        
+                        Log.d("HomeViewModel", "Successfully added favorite: ${favorite.artistId}")
+
                         // Update favorite status in all artist lists
                         updateArtistFavoriteStatus(favorite.artistId, true)
-                        
+
                         // Mark that we need to refresh detailed information
                         markNeedsRefresh()
                         _snackbarMessage.emit("Added to Favorites")
+
+                        // Fetch and cache artist detail in the background
+                        viewModelScope.launch(Dispatchers.IO) {
+                            try {
+                                val detail = artistRepository.getArtistDetailsById(favorite.artistId)
+                                if (detail != null) {
+                                    val now = System.currentTimeMillis()
+                                    artistDetailCache[favorite.artistId] = Pair(detail, now)
+                                    Log.d("HomeViewModel", "Cached artist detail for ${favorite.artistId} after favoriting")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("HomeViewModel", "Failed to fetch/cache artist detail for ${favorite.artistId}: ${e.message}")
+                            }
+                        }
                     }
                 } else {
-                    val statusCode = response.code()
-                    Log.e("HomeViewModel", "Failed to add favorite: $statusCode")
-                    
-                    if (statusCode == 401) {
-                        // Token expired or invalid, notify auth system
-                        Log.w("HomeViewModel", "Unauthorized (401) when adding favorite - token may be expired")
-                        viewModelScope.launch {
-                            authManager.handleUnauthorized()
-                        }
-                        // Clear favorites since we're not authorized
-                        _favourites.value = emptyList()
-                        _favouriteIds.value = emptySet()
-                    } else {
-                        _error.value = "Failed to add favourite: $statusCode"
-                    }
+                    Log.e("HomeViewModel", "Failed to add favorite: ${response.code()}")
+                    _error.value = "Failed to add favorite: ${response.code()}"
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error adding favorite: ${e.message}")
-                _error.value = "Error adding favourite: ${e.message}"
+                _error.value = "Error adding favorite: ${e.message}"
             }
         }
     }
@@ -477,11 +501,15 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 Log.d("HomeViewModel", "Removing favorite: $artistId")
-                val response = apiService.removeFavourite(artistId)
+                val response = artistRepository.removeFavourite(artistId)
                 if (response.isSuccessful) {
                     // Update local state immediately
                     _favourites.value = _favourites.value.filter { it.artistId != artistId }
-                    _favouriteIds.value = _favouriteIds.value - artistId
+                    
+                    val updatedIds = _favouriteIds.value.toMutableSet()
+                    updatedIds.remove(artistId)
+                    _favouriteIds.value = updatedIds
+                    
                     Log.d("HomeViewModel", "Successfully removed favorite: $artistId")
                     
                     // Update favorite status in all artist lists
@@ -511,11 +539,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Updates the isFavorite property of an artist across all lists
-     * @param artistId ID of the artist to update
-     * @param isFavorite New favorite status
-     */
     private fun updateArtistFavoriteStatus(artistId: String, isFavorite: Boolean) {
         Log.d("HomeViewModel", "Updating favorite status for artist $artistId to $isFavorite")
         
@@ -549,9 +572,6 @@ class HomeViewModel @Inject constructor(
         Log.d("HomeViewModel", "Favorite status updated for artist $artistId across all lists")
     }
     
-    /**
-     * Updates isFavorited property for all artists in all lists based on current favorites
-     */
     private fun updateAllArtistsFavoriteStatus() {
         Log.d("HomeViewModel", "Updating favorite status for all artists based on current favorites: ${_favouriteIds.value}")
         
@@ -577,10 +597,6 @@ class HomeViewModel @Inject constructor(
         Log.d("HomeViewModel", "Favorite status updated for all artists")
     }
 
-    /**
-     * Gets the current auth token
-     * @return The auth token or null if not authenticated
-     */
     fun getAuthToken(): String? {
         return authManager.getAuthToken()
     }

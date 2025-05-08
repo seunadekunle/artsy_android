@@ -388,7 +388,7 @@ class AuthViewModel @Inject constructor(
                     authManager.clearAuthState() // Use AuthManager to clear session
                     
                     // Emit success event with message from server or default
-                    val successMsg = responseBody?.message ?: "Account deleted successfully"
+                    val successMsg = responseBody?.message ?: "Deleted user successfully"
                     viewModelScope.launch {
                         delay(200) // Brief delay so UI can process the state change
                         authManager.emitAuthEvent(Success(successMsg))

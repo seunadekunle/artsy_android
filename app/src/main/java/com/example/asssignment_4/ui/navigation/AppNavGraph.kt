@@ -57,6 +57,12 @@ fun AppNavGraph(
                     Screen.ArtistDetail.route -> fadeOut(animationSpec = detailFadeSpec)
                     else -> fadeOut(animationSpec = fadeSpec)
                 }
+            },
+            popEnterTransition = {
+                when (initialState.destination.route) {
+                    Screen.Search.route -> slideInHorizontally(animationSpec = slideSpec) { -it }
+                    else -> fadeIn(animationSpec = fadeSpec)
+                }
             }
         ) {
             HomeScreen(navController = navController)

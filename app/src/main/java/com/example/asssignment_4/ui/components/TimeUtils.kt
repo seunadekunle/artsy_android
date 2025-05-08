@@ -60,37 +60,30 @@ fun getRelativeTimeSpan(dateTime: Instant, context: Context): String {
     val now = System.currentTimeMillis()
     val time = dateTime.toEpochMilli()
     
-    // Handle future dates (server time zone issues, etc.)
     if (time > now) {
         return "just now"
     }
     
-    // Calculate time difference in milliseconds
     val diff = now - time
     
     return when {
-        // Less than a minute
-        diff < 60_000 -> "just now"
-        
-        // Less than an hour
+        diff < 1_000 -> "just now"
+        diff < 60_000 -> {
+            val seconds = diff / 1_000
+            "$seconds ${if (seconds == 1L) "second" else "seconds"} ago"
+        }
         diff < 3_600_000 -> {
             val minutes = diff / 60_000
             "$minutes ${if (minutes == 1L) "minute" else "minutes"} ago"
         }
-        
-        // Less than a day
         diff < 86_400_000 -> {
             val hours = diff / 3_600_000
             "$hours ${if (hours == 1L) "hour" else "hours"} ago"
         }
-        
-        // Less than a week
         diff < 604_800_000 -> {
             val days = diff / 86_400_000
             "$days ${if (days == 1L) "day" else "days"} ago"
         }
-        
-        // Otherwise use Android's formatting but ensure it's in the past
         else -> DateUtils.getRelativeTimeSpanString(
             time,
             now,
