@@ -105,15 +105,19 @@ fun SearchScreen(
         homeViewModel.refreshFavoriteStatuses()
     }
     
-    // Synchronize favorites when screen is displayed or when refresh is needed
+    // Fast two-phase approach: first update UI from cache, then refresh from network
     LaunchedEffect(Unit) {
-        // Initial synchronization when screen is displayed
+        // Immediately update UI with cached data for instant feedback
+        homeViewModel.updateAllArtistsFavoriteStatus()
+        
+        // Then trigger async network refresh
         homeViewModel.synchronizeFavorites()
     }
     
-    // Additional refresh when needsRefresh flag is set
+    // Handle refresh flag with optimized synchronization
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
+            // Trigger synchronization which handles both UI updates and network refresh
             homeViewModel.synchronizeFavorites()
         }
     }

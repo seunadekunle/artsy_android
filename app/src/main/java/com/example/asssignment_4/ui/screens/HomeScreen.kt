@@ -191,17 +191,20 @@ fun HomeScreen(
         }
     }
     
-    // This effect ensures the screen updates when returning from other screens
-    // and synchronizes favorites across all screens
+    // Fast two-phase approach for immediate UI updates followed by background refresh
     LaunchedEffect(Unit) {
-        Log.d("HomeScreen", "Initial synchronization of favorites")
+        Log.d("HomeScreen", "Fast initial rendering of favorites")
+        // Phase 1: Immediate UI update from cache
+        homeViewModel.updateAllArtistsFavoriteStatus()
+        
+        // Phase 2: Background refresh
         homeViewModel.synchronizeFavorites()
     }
     
-    // This effect watches the needsRefresh flag and synchronizes when needed
+    // Optimized refresh when needsRefresh flag is set
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
-            Log.d("HomeScreen", "Refreshing favorites due to needsRefresh flag")
+            Log.d("HomeScreen", "Fast refresh due to needsRefresh flag")
             homeViewModel.synchronizeFavorites()
         }
     }

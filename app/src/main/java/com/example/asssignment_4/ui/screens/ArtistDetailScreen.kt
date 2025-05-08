@@ -124,22 +124,45 @@ fun ArtistDetailScreen(
     // Get the current artist detail from ViewModel to ensure we have the latest state
     val currentArtistDetail = viewModel.artistDetail.collectAsState().value
     
-    // Calculate favorite status from multiple sources to ensure accuracy
-    val isFavorite = remember(artist?.id, favouriteIds, currentArtistDetail) {
-        // First check if the artist ID is in the favorites set
-        val isInFavorites = artist?.id?.let { favouriteIds.contains(it) } ?: false
-        
-        // Also check the isFavorite property on the artist object itself as a backup
-        val artistHasFavoriteFlag = artist?.isFavorite ?: false
-        
-        // Also check if the current artist detail has the favorite flag set
-        val detailHasFavoriteFlag = currentArtistDetail?.isFavorite ?: false
-        
-        // Log all sources for debugging
-        Log.d("ArtistDetailScreen", "Favorite status sources - ID in favorites: $isInFavorites, Artist flag: $artistHasFavoriteFlag, Detail flag: $detailHasFavoriteFlag")
-        
-        // Return true if any source indicates this is a favorite
-        isInFavorites || artistHasFavoriteFlag || detailHasFavoriteFlag
+    // Use a faster approach for favorite status with mutableState for immediate UI updates
+    // and derived state for accuracy
+    var isFavorite by remember { mutableStateOf(false) }
+    
+    // Update favorite status immediately from local cache first
+    DisposableEffect(artist?.id) {
+        // Immediate local check for fastest UI response
+        if (artist?.id != null) {
+            // Prioritize the favorites set for immediate response
+            val quickCheckResult = favouriteIds.contains(artist.id) || artist.isFavorite
+            isFavorite = quickCheckResult
+            Log.d("ArtistDetailScreen", "Quick favorite check: $quickCheckResult for ${artist.id}")
+        }
+        onDispose { }
+    }
+    
+    // Then update with the complete check for accuracy
+    LaunchedEffect(artist?.id, favouriteIds, currentArtistDetail) {
+        if (artist?.id != null) {
+            // First check if the artist ID is in the favorites set
+            val isInFavorites = favouriteIds.contains(artist.id)
+            
+            // Also check the isFavorite property on the artist object itself as a backup
+            val artistHasFavoriteFlag = artist.isFavorite
+            
+            // Also check if the current artist detail has the favorite flag set
+            val detailHasFavoriteFlag = currentArtistDetail?.isFavorite ?: false
+            
+            // Combine all sources
+            val newStatus = isInFavorites || artistHasFavoriteFlag || detailHasFavoriteFlag
+            
+            // Only log if there's a change to reduce noise
+            if (isFavorite != newStatus) {
+                Log.d("ArtistDetailScreen", "Favorite status updated: $newStatus for ${artist.id}")
+            }
+            
+            // Update the state
+            isFavorite = newStatus
+        }
     }
     
     // Force refresh favorite status when screen is shown and ensure cross-screen synchronization

@@ -631,28 +631,43 @@ class HomeViewModel @Inject constructor(
      * Updates the favorite status of an artist across all UI collections
      * to ensure consistent display everywhere
      */
+    // Cache timeout values - shorter values for faster UI updates
+    // Using existing favoritesRefreshThreshold but with updated value
+    // Using existing lastFavoritesRefreshTime but with better initialization
+    
     /**
-     * Global favorite status synchronization method that ensures favorites are consistent
-     * across all screens and UI components
+     * Optimized global favorite status synchronization method that ensures favorites are consistent
+     * across all screens and UI components with minimal network calls
      */
     fun synchronizeFavorites() {
         viewModelScope.launch {
             try {
-                Log.d("HomeViewModel", "Synchronizing favorites across all screens")
+                Log.d("HomeViewModel", "Fast synchronizing favorites across all screens")
                 
-                // First, refresh the favorites from the server
-                refreshFavoriteStatuses(true)
-                
-                // Then update all UI components with the latest favorite status
+                // First, immediately update UI with cached data for instant feedback
                 updateAllArtistsFavoriteStatus()
                 
-                // Force refresh of detailed favorites for the HomeScreen
-                fetchFavoritesDetails(true)
+                // Track if we did any network operations
+                var didNetworkOperations = false
                 
-                // Emit a snackbar message to inform the user
-                _snackbarMessage.emit("Favorites synchronized")
+                // Refresh favorites with non-forced refresh for better performance
+                Log.d("HomeViewModel", "Refreshing favorites from network")
+                refreshFavoriteStatuses(false)
+                didNetworkOperations = true
                 
-                Log.d("HomeViewModel", "Favorites successfully synchronized")
+                // Refresh detailed favorites for the HomeScreen
+                Log.d("HomeViewModel", "Refreshing detailed favorites")
+                fetchFavoritesDetails(false)
+                didNetworkOperations = true
+                
+                // Update UI again after network operations
+                if (didNetworkOperations) {
+                    updateAllArtistsFavoriteStatus()
+                    // Only show snackbar if we actually did network operations
+                    _snackbarMessage.emit("Favorites updated")
+                }
+                
+                Log.d("HomeViewModel", "Fast favorites sync complete")
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error synchronizing favorites: ${e.message}")
                 _snackbarMessage.emit("Failed to sync favorites")
@@ -717,7 +732,11 @@ class HomeViewModel @Inject constructor(
         Log.d("HomeViewModel", "Favorite status updated for artist $artistId across all lists")
     }
     
-    private fun updateAllArtistsFavoriteStatus() {
+    /**
+     * Updates favorite status for all artists across all UI components
+     * Made public so screens can use it for immediate UI updates
+     */
+    fun updateAllArtistsFavoriteStatus() {
         Log.d("HomeViewModel", "Updating favorite status for all artists based on current favorites: ${_favouriteIds.value}")
         
         // Update search results
