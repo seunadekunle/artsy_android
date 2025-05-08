@@ -41,6 +41,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -120,14 +121,34 @@ fun ArtistDetailScreen(
     val isLoggedIn = authViewModel.isLoggedIn.collectAsState().value
     val favouriteIds = viewModel.favouriteIds.collectAsState().value
     
-    // Track favorite status with both state collection and local state to ensure UI updates
-    var isFavorite by remember { mutableStateOf(false) }
+    // Get the current artist detail from ViewModel to ensure we have the latest state
+    val currentArtistDetail = viewModel.artistDetail.collectAsState().value
     
-    // Update local favorite state whenever artist or favorite IDs change
-    LaunchedEffect(artist?.id, favouriteIds) {
-        val newFavoriteStatus = artist?.id?.let { favouriteIds.contains(it) } ?: false
-        Log.d("ArtistDetailScreen", "Favorite status updated: ${artist?.id} - $newFavoriteStatus")
-        isFavorite = newFavoriteStatus
+    // Calculate favorite status from multiple sources to ensure accuracy
+    val isFavorite = remember(artist?.id, favouriteIds, currentArtistDetail) {
+        // First check if the artist ID is in the favorites set
+        val isInFavorites = artist?.id?.let { favouriteIds.contains(it) } ?: false
+        
+        // Also check the isFavorite property on the artist object itself as a backup
+        val artistHasFavoriteFlag = artist?.isFavorite ?: false
+        
+        // Also check if the current artist detail has the favorite flag set
+        val detailHasFavoriteFlag = currentArtistDetail?.isFavorite ?: false
+        
+        // Log all sources for debugging
+        Log.d("ArtistDetailScreen", "Favorite status sources - ID in favorites: $isInFavorites, Artist flag: $artistHasFavoriteFlag, Detail flag: $detailHasFavoriteFlag")
+        
+        // Return true if any source indicates this is a favorite
+        isInFavorites || artistHasFavoriteFlag || detailHasFavoriteFlag
+    }
+    
+    // Force refresh favorite status when screen is shown and ensure cross-screen synchronization
+    LaunchedEffect(artist?.id) {
+        if (artist?.id != null) {
+            Log.d("ArtistDetailScreen", "Forcing refresh of favorite status for ${artist.id}")
+            // Synchronize favorites across all screens to ensure consistency
+            viewModel.synchronizeFavorites()
+        }
     }
     
     val similarArtists = viewModel.similarArtists.collectAsState().value
@@ -210,7 +231,7 @@ fun ArtistDetailScreen(
                             }
                         ) {
                             Icon(
-                                imageVector = if (isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                 contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
                                 tint = MaterialTheme.colorScheme.onPrimary
                             )

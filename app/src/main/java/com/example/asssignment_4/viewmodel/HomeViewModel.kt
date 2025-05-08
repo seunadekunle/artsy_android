@@ -222,37 +222,54 @@ class HomeViewModel @Inject constructor(
                 _isDetailLoading.value = true
                 _detailError.value = null
                 
-                // Fetch from cache if available
-                val cachedArtist = artistDetailCache[artistId]?.first
-                if (cachedArtist != null) {
+                // First, check if this artist is in favorites to ensure correct status
+                val isFavorite = _favouriteIds.value.contains(artistId)
+                Log.d("HomeViewModel", "Artist $artistId favorite status before fetch: $isFavorite")
+                
+                // Check if we have a cached version that's still fresh
+                val cachedArtist = artistDetailCache[artistId]
+                if (cachedArtist != null && System.currentTimeMillis() - cachedArtist.second < 60000) {
                     Log.d("HomeViewModel", "Using cached artist details for $artistId")
-                    _artistDetail.value = cachedArtist
-                    fetchSimilarArtists(artistId, authManager.getAuthToken())
-                    return@launch
+                    // Make sure we update the favorite status even for cached artists
+                    val updatedArtist = cachedArtist.first.copy(isFavorite = isFavorite)
+                    _artistDetail.value = updatedArtist
+                    // Update the cache with the correct favorite status
+                    artistDetailCache[artistId] = Pair(updatedArtist, System.currentTimeMillis())
+                } else {
+                    // Fetch fresh data
+                    Log.d("HomeViewModel", "Fetching fresh artist details for $artistId")
+                    val artist = artistRepository.getArtistDetailsById(artistId)
+                    if (artist != null) {
+                        // Ensure favorite status is set correctly before caching
+                        val artistWithCorrectFavoriteStatus = artist.copy(isFavorite = isFavorite)
+                        // Cache the result with correct favorite status
+                        artistDetailCache[artistId] = Pair(artistWithCorrectFavoriteStatus, System.currentTimeMillis())
+                        _artistDetail.value = artistWithCorrectFavoriteStatus
+                        Log.d("HomeViewModel", "Set artist detail with favorite status: $isFavorite")
+                    } else {
+                        _detailError.value = "Failed to fetch artist details"
+                    }
                 }
                 
-                val response = artistRepository.getArtistDetailsById(artistId)
-                if (response != null) {
-                    // Update with favorite status
-                    val isFavorite = _favouriteIds.value.contains(response.id)
-                    _artistDetail.value = response.copy(isFavorite = isFavorite)
-                    
-                    // Fetch artworks for this artist
-                    try {
-                        val artworksResponse = artistRepository.getArtistArtworks(artistId)
-                        // Extract artworks from the embedded structure
-                        _artistArtworks.value = artworksResponse.embedded?.artworks ?: emptyList()
-                    } catch (e: Exception) {
-                        Log.e("HomeViewModel", "Error fetching artworks: ${e.message}", e)
-                        _artistArtworks.value = emptyList()
-                    }
-                    
-                    // Fetch similar artists
-                    fetchSimilarArtists(artistId, authManager.getAuthToken())
-                } else {
-                    _detailError.value = "Failed to load artist details"
+                // Fetch artworks for this artist
+                try {
+                    val artworksResponse = artistRepository.getArtistArtworks(artistId)
+                    // Extract artworks from the embedded structure
+                    _artistArtworks.value = artworksResponse.embedded?.artworks ?: emptyList()
+                    Log.d("HomeViewModel", "Fetched ${_artistArtworks.value.size} artworks for artist $artistId")
+                } catch (e: Exception) {
+                    Log.e("HomeViewModel", "Error fetching artworks: ${e.message}", e)
+                    _artistArtworks.value = emptyList()
                 }
+                
+                // Fetch similar artists
+                fetchSimilarArtists(artistId, getAuthToken())
+                
+                // Ensure favorite status is correctly reflected in UI
+                updateArtistFavoriteStatus(artistId, isFavorite)
+                
             } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error fetching artist details: ${e.message}")
                 _detailError.value = "Error: ${e.message}"
                 Log.e("HomeViewModel", "Error fetching artist details: ${e.message}", e)
             } finally {
@@ -614,6 +631,35 @@ class HomeViewModel @Inject constructor(
      * Updates the favorite status of an artist across all UI collections
      * to ensure consistent display everywhere
      */
+    /**
+     * Global favorite status synchronization method that ensures favorites are consistent
+     * across all screens and UI components
+     */
+    fun synchronizeFavorites() {
+        viewModelScope.launch {
+            try {
+                Log.d("HomeViewModel", "Synchronizing favorites across all screens")
+                
+                // First, refresh the favorites from the server
+                refreshFavoriteStatuses(true)
+                
+                // Then update all UI components with the latest favorite status
+                updateAllArtistsFavoriteStatus()
+                
+                // Force refresh of detailed favorites for the HomeScreen
+                fetchFavoritesDetails(true)
+                
+                // Emit a snackbar message to inform the user
+                _snackbarMessage.emit("Favorites synchronized")
+                
+                Log.d("HomeViewModel", "Favorites successfully synchronized")
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error synchronizing favorites: ${e.message}")
+                _snackbarMessage.emit("Failed to sync favorites")
+            }
+        }
+    }
+    
     private fun updateArtistFavoriteStatus(artistId: String, isFavorite: Boolean) {
         Log.d("HomeViewModel", "Updating favorite status for artist $artistId to $isFavorite")
         
@@ -658,6 +704,14 @@ class HomeViewModel @Inject constructor(
                 }
             }
             _similarArtists.value = updatedSimilarArtists
+            
+            // Update the cache to ensure consistency when navigating back to screens
+            artistDetailCache.entries.forEach { (id, pair) ->
+                if (id == artistId) {
+                    val (artist, timestamp) = pair
+                    artistDetailCache[id] = Pair(artist.copy(isFavorite = isFavorite), timestamp)
+                }
+            }
         }
         
         Log.d("HomeViewModel", "Favorite status updated for artist $artistId across all lists")

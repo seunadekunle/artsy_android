@@ -192,14 +192,17 @@ fun HomeScreen(
     }
     
     // This effect ensures the screen updates when returning from other screens
+    // and synchronizes favorites across all screens
     LaunchedEffect(Unit) {
-        homeViewModel.refreshFavoriteStatuses()
+        Log.d("HomeScreen", "Initial synchronization of favorites")
+        homeViewModel.synchronizeFavorites()
     }
     
-    // This effect watches the needsRefresh flag and refreshes when needed
+    // This effect watches the needsRefresh flag and synchronizes when needed
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
-            homeViewModel.refreshFavoriteStatuses()
+            Log.d("HomeScreen", "Refreshing favorites due to needsRefresh flag")
+            homeViewModel.synchronizeFavorites()
         }
     }
 

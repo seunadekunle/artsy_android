@@ -105,10 +105,16 @@ fun SearchScreen(
         homeViewModel.refreshFavoriteStatuses()
     }
     
-    // This effect watches the needsRefresh flag and refreshes when needed
+    // Synchronize favorites when screen is displayed or when refresh is needed
+    LaunchedEffect(Unit) {
+        // Initial synchronization when screen is displayed
+        homeViewModel.synchronizeFavorites()
+    }
+    
+    // Additional refresh when needsRefresh flag is set
     LaunchedEffect(needsRefresh) {
         if (needsRefresh) {
-            homeViewModel.refreshFavoriteStatuses()
+            homeViewModel.synchronizeFavorites()
         }
     }
 
