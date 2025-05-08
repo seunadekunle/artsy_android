@@ -327,32 +327,36 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _authError.value = null
+            _userState.value = UserState.Loading
+            
             try {
-                // The manuallyLoggedOut flag will be set by AuthManager.clearAuthState()
-                val response = authRepository.logout()
+                // First clear local auth state
+                _currentUser.value = null
+                _userState.value = UserState.NotLoggedIn
+                authManager.clearAuthState() // Use AuthManager to clear session
                 
-                if (response.isSuccessful || response.code() == 401) { // Treat 401 as success if already logged out
-                    _currentUser.value = null
-                    _userState.value = UserState.NotLoggedIn
-                    _authError.value = null
-                    authManager.clearAuthState() // Use AuthManager to clear session
+                // Then make the logout API call
+                val response = authRepository.logout()
+                if (response.isSuccessful) {
+                    // Emit success event
                     viewModelScope.launch {
+                        delay(200) // Brief delay so UI can process the state change
                         authManager.emitAuthEvent(Success("Logged out successfully"))
                     }
                 } else {
-                    val errorMsg = "Logout Failed: ${response.code()}"
-                    _authError.value = errorMsg
-                    _userState.value = UserState.Error(errorMsg)
+                    // Even if the API call fails, we keep the user logged out locally
+                    Log.w("AuthViewModel", "Logout API call failed but user was logged out locally: ${response.code()}")
                     viewModelScope.launch {
-                        authManager.emitAuthEvent(Failure(errorMsg))
+                        delay(200)
+                        authManager.emitAuthEvent(Success("Logged out successfully"))
                     }
                 }
             } catch (e: Exception) {
-                val errorMsg = "Error during logout: ${e.message}"
-                _authError.value = errorMsg
-                _userState.value = UserState.Error(errorMsg)
+                // Even if there's an error, we keep the user logged out locally
+                Log.e("AuthViewModel", "Exception during logout but user was logged out locally", e)
                 viewModelScope.launch {
-                    authManager.emitAuthEvent(Failure(errorMsg))
+                    delay(200)
+                    authManager.emitAuthEvent(Success("Logged out successfully"))
                 }
             } finally {
                 _isLoading.value = false

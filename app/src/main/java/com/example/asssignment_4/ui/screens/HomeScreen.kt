@@ -86,10 +86,7 @@ fun HomeScreen(
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
 
-    val searchTerm by homeViewModel.searchTerm.collectAsState()
-    val searchResults by homeViewModel.searchResults.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()
-    val error by homeViewModel.error.collectAsState()
     val needsRefresh by homeViewModel.needsRefresh.collectAsState()
     val favourites by homeViewModel.favourites.collectAsState()
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
@@ -111,6 +108,12 @@ fun HomeScreen(
     LaunchedEffect(isTokenPresent, currentUser) {
         Log.d("HomeScreen", "Login state: isTokenPresent=$isTokenPresent, currentUser=${currentUser != null}, final isLoggedIn=$isLoggedIn")
     }
+    // Preload favorite artist details as soon as HomeScreen is visible and user is logged in
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            homeViewModel.fetchFavoritesDetails()
+        }
+    }
     
     val focusManager = LocalFocusManager.current
 
@@ -119,9 +122,23 @@ fun HomeScreen(
         Log.d("HomeScreen", "Current userState in HomeScreen UI = $userState")
     }
 
-    var showMenu by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Collect auth events for snackbar messages
+    LaunchedEffect(Unit) {
+        authViewModel.authEvent.collect { event ->
+            when (event) {
+                is AuthManagerEvent.Success -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                is AuthManagerEvent.Failure -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                else -> {}
+            }
+        }
+    }
 
     // Refresh favorites when login state changes
     LaunchedEffect(isLoggedIn) {
@@ -256,8 +273,11 @@ fun HomeScreen(
                                             DropdownMenuItem(
                                                 text = { Text("Log out", fontWeight = FontWeight.Medium) },
                                                 onClick = {
-                                                    authViewModel.logoutUser()
-                                                    showMenu = false
+                                                    scope.launch {
+                                                        authViewModel.logoutUser()
+                                                        showMenu = false
+                                                        snackbarHostState.showSnackbar("Logged out successfully")
+                                                    }
                                                 }
                                             )
                                             DropdownMenuItem(
@@ -304,8 +324,12 @@ fun HomeScreen(
                 .padding(paddingValues)
         ) {
             // Date
+            val today = remember { java.time.LocalDate.now() }
+            val formattedDate = remember(today) {
+                today.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy"))
+            }
             Text(
-                text = "31 March 2025",
+                text = formattedDate,
                 style = MaterialTheme.typography.titleSmall,
                 color = Color(0xDF555555),
                 fontWeight = FontWeight.W500,

@@ -263,24 +263,19 @@ class HomeViewModel @Inject constructor(
     /**
      * Fetch detailed artist information for each favorite
      */
-    private suspend fun fetchFavoritesDetails() {
+    suspend fun fetchFavoritesDetails() {
         try {
             val favorites = _favourites.value
-            val detailedList = mutableListOf<Pair<Favorite, Artist?>>()
-
+            
             // Use async to fetch artist details in parallel
             val deferredArtists = favorites.map { favorite ->
                 viewModelScope.async(Dispatchers.IO) {
                     try {
-                        val response = artistRepository.getArtistById(favorite.artistId)
-                        if (response.isSuccessful) {
-                            val artist = response.body()
-                            if (artist != null) {
-                                artist.isFavorite = true
-                                Pair(favorite, artist)
-                            } else null
+                        val response = artistRepository.getArtistDetailsById(favorite.artistId)
+                        if (response != null) {
+                            Pair(favorite, response)
                         } else {
-                            Log.e("HomeViewModel", "Error fetching artist details: ${response.code()}")
+                            Log.e("HomeViewModel", "No artist details found for ${favorite.artistId}")
                             null
                         }
                     } catch (e: Exception) {

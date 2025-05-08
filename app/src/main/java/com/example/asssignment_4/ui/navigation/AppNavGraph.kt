@@ -45,14 +45,14 @@ fun AppNavGraph(
             route = Screen.Home.route,
             enterTransition = {
                 when (initialState.destination.route) {
-                    Screen.Search.route -> slideInHorizontally(animationSpec = slideSpec) { -it }
+                    Screen.Search.route -> slideInHorizontally(animationSpec = slideSpec) { it }
                     Screen.ArtistDetail.route -> fadeIn(animationSpec = detailFadeSpec)
                     else -> fadeIn(animationSpec = fadeSpec)
                 }
             },
             exitTransition = {
                 when (targetState.destination.route) {
-                    Screen.Search.route -> slideOutHorizontally(animationSpec = slideSpec) { it }
+                    Screen.Search.route -> slideOutHorizontally(animationSpec = slideSpec) { -it }
                     Screen.Login.route -> fadeOut(animationSpec = fadeSpec)
                     Screen.ArtistDetail.route -> fadeOut(animationSpec = detailFadeSpec)
                     else -> fadeOut(animationSpec = fadeSpec)
@@ -65,16 +65,16 @@ fun AppNavGraph(
         composable(
             route = Screen.Search.route,
             enterTransition = {
-                slideInHorizontally(initialOffsetX = { it }) + fadeIn()
-            },
-            exitTransition = {
-                slideOutHorizontally(targetOffsetX = { -it })
-            },
-            popEnterTransition = {
                 slideInHorizontally(initialOffsetX = { -it }) + fadeIn()
             },
+            exitTransition = {
+                slideOutHorizontally(targetOffsetX = { it })
+            },
+            popEnterTransition = {
+                slideInHorizontally(initialOffsetX = { it }) + fadeIn()
+            },
             popExitTransition = {
-                slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                slideOutHorizontally(targetOffsetX = { it })
             }
         ) {
             SearchScreen(navController = navController)

@@ -309,7 +309,7 @@ fun ArtistDetailScreen(
                                 )
                                 
                                 // Artist subtitle with special characters, increased font weight and larger size
-                                if (artistSubtitle != "-") {
+                                if (artistSubtitle.isNotEmpty()) {
                                     Spacer(Modifier.height(4.dp))
                                     Text(
                                         text = artistSubtitle.replace(" • ", " \u2022 "),
@@ -608,11 +608,15 @@ fun ArtistDetailScreen(
 fun formatArtistInfo(artist: Artist?): String {
     val details = mutableListOf<String?>()
     details.add(artist?.nationality)
-    val birth = artist?.birthday
-    val death = artist?.deathday
+    val birth = artist?.birthday?.takeIf { it.isNotBlank() }
+    val death = artist?.deathday?.takeIf { it.isNotBlank() }
+
     if (birth != null || death != null) {
         details.add("${birth ?: "?"} - ${death ?: "?"}")
+    } else if (artist?.nationality.isNullOrBlank()) {
+        return ""
     }
+
     return details.filterNotNull().filter { it.isNotEmpty() }.joinToString(", ")
 }
 
