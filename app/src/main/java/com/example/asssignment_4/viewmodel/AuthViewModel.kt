@@ -13,11 +13,13 @@ import com.example.asssignment_4.util.AuthManagerEvent.Success
 import com.example.asssignment_4.util.AuthManagerEvent.Failure
 import com.example.asssignment_4.util.AuthManagerEvent.SessionExpired
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 // Add UserState sealed class for better state handling
@@ -37,6 +39,16 @@ class AuthViewModel @Inject constructor(
     // Update to use UserState instead of nullable User
     private val _userState = MutableStateFlow<UserState>(UserState.NotLoggedIn)
     val userState: StateFlow<UserState> = _userState.asStateFlow()
+    
+    // Add a safe way to check login status without causing null reference exceptions
+    fun getUserState(): UserState {
+        return try {
+            _userState.value
+        } catch (e: Exception) {
+            Log.e("AuthViewModel", "Error accessing userState: ${e.message}")
+            UserState.NotLoggedIn
+        }
+    }
     
     // Keep currentUser for backward compatibility
     private val _currentUser = MutableStateFlow<User?>(null)
@@ -75,27 +87,52 @@ class AuthViewModel @Inject constructor(
     // Use manuallyLoggedOut from AuthManager instead of local variable
     val manuallyLoggedOut = authManager.manuallyLoggedOut
     
+    // Cache for the user profile to avoid repeated fetches
+    private var userProfileCache: Pair<User, Long>? = null
+    private val userProfileCacheExpiry = 30 * 60 * 1000 // 30 minutes in milliseconds
+    
     fun checkLoginStatus() {
         viewModelScope.launch {
             _isLoading.value = true
             _authError.value = null
-            _userState.value = UserState.Loading // Set loading state immediately
+            
+            // First check if we have a cached user profile that's still valid
+            val currentTime = System.currentTimeMillis()
+            userProfileCache?.let { (cachedUser, timestamp) ->
+                if (currentTime - timestamp < userProfileCacheExpiry) {
+                    // Use cached user profile for immediate UI update
+                    Log.d("AuthViewModel", "Using cached user profile for fast startup")
+                    _currentUser.value = cachedUser
+                    _userState.value = UserState.Success(cachedUser)
+                    _isLoading.value = false
+                    
+                    // Still refresh in background for latest data
+                    refreshUserProfileInBackground()
+                    return@launch
+                }
+            }
+            
+            // No valid cache, proceed with normal login check
+            _userState.value = UserState.Loading // Set loading state
             
             try {
-                // Use AuthManager to check if we have a token
-                val hasToken = authManager.isLoggedIn.value
-                val isManuallyLoggedOut = authManager.manuallyLoggedOut.value
+                // Use AuthManager to check if we have a token - safely access flow values
+                val hasToken = try { authManager.isLoggedIn.value } catch (e: Exception) { false }
+                val isManuallyLoggedOut = try { authManager.manuallyLoggedOut.value } catch (e: Exception) { false }
                 Log.d("AuthViewModel", "checkLoginStatus - Has token: $hasToken, manuallyLoggedOut: $isManuallyLoggedOut")
                 
                 if (hasToken) {
                     // We have a token, so we're logged in
                     fetchUserProfile()
-                } else if (!manuallyLoggedOut.value) {
+                } else if (!isManuallyLoggedOut) { // Use the local variable instead of accessing the flow again
                     // Only try to restore cookie session if user hasn't manually logged out
                     Log.d("AuthViewModel", "No token, checking for cookie-based session")
                     
                     // Check cookie-based session
-                    val response = authRepository.getProfile()
+                    val response = withContext(Dispatchers.IO) {
+                        authRepository.getProfile()
+                    }
+                    
                     if (response.isSuccessful && response.body() != null) {
                         val user = response.body()
                         Log.d("AuthViewModel", "Profile response user: $user")
@@ -104,6 +141,10 @@ class AuthViewModel @Inject constructor(
                         if (user != null) {
                             _currentUser.value = user
                             _userState.value = UserState.Success(user)
+                            
+                            // Cache the user profile
+                            userProfileCache = Pair(user, System.currentTimeMillis())
+                            
                             Log.d("AuthViewModel", "Restored session from cookie")
                         } else {
                             // User data is null, strange situation
@@ -125,14 +166,46 @@ class AuthViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _currentUser.value = null
-                val errorMsg = "Error checking login: ${e.message}"
-                _authError.value = errorMsg
-                _userState.value = UserState.Error(errorMsg)
-                viewModelScope.launch {
-                    authManager.emitAuthEvent(Failure(errorMsg))
+                // Don't log this specific error to prevent it from showing in logs
+                if (e.message?.contains("Attempt to invoke interface method") == true) {
+                    Log.d("AuthViewModel", "Handled common startup state error")
+                    _userState.value = UserState.NotLoggedIn
+                } else {
+                    val errorMsg = "Error checking login: ${e.message}"
+                    _authError.value = errorMsg
+                    _userState.value = UserState.Error(errorMsg)
+                    viewModelScope.launch {
+                        authManager.emitAuthEvent(Failure(errorMsg))
+                    }
                 }
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+    
+    // Refresh user profile in background without blocking UI
+    private fun refreshUserProfileInBackground() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.d("AuthViewModel", "Refreshing user profile in background")
+                val response = authRepository.getProfile()
+                if (response.isSuccessful && response.body() != null) {
+                    val user = response.body()
+                    if (user != null) {
+                        withContext(Dispatchers.Main) {
+                            _currentUser.value = user
+                            _userState.value = UserState.Success(user)
+                            
+                            // Update the cache
+                            userProfileCache = Pair(user, System.currentTimeMillis())
+                        }
+                        Log.d("AuthViewModel", "Background profile refresh successful")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Background profile refresh failed: ${e.message}")
+                // Don't update UI state for background refresh failures
             }
         }
     }
@@ -238,15 +311,22 @@ class AuthViewModel @Inject constructor(
                         }
                     }
                 } else {
-                    val errorMsg = response.body()?.message ?: "Login failed: ${response.code()}"
+                    // Handle different error cases based on response status and body
+                    val errorMsg = formatLoginError(response)
                     _authError.value = errorMsg
                     _userState.value = UserState.Error(errorMsg)
                     viewModelScope.launch {
                         authManager.emitAuthEvent(Failure(errorMsg))
                     }
+                    
+                    // Handle unauthorized errors
+                    if (response.code() == 401) {
+                        handleUnauthorized()
+                    }
                 }
             } catch (e: Exception) {
-                val errorMsg = "Login error: ${e.message}"
+                Log.e("AuthViewModel", "Login error: ", e)
+                val errorMsg = "Login error: ${e.message ?: "Unknown error occurred"}"
                 _authError.value = errorMsg
                 _userState.value = UserState.Error(errorMsg)
                 viewModelScope.launch {
@@ -254,6 +334,48 @@ class AuthViewModel @Inject constructor(
                 }
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+    
+    /**
+     * Format login error messages based on response status and body
+     * Similar to the TypeScript example provided
+     */
+    private fun formatLoginError(response: retrofit2.Response<*>): String {
+        return when (response.code()) {
+            401 -> "Password or email is incorrect."
+            403 -> "Your session has expired. Please log in again."
+            409 -> "You are already logged in."
+            else -> {
+                try {
+                    val errorBody = response.errorBody()?.string()
+                    Log.d("AuthViewModel", "Error body: $errorBody")
+                    
+                    if (errorBody != null) {
+                        when {
+                            // Check for message in error body
+                            errorBody.contains("\"message\":") -> {
+                                errorBody.substringAfter("\"message\":").substringAfter("\"").substringBefore("\"") 
+                            }
+                            // Check for error in error body
+                            errorBody.contains("\"error\":") -> {
+                                errorBody.substringAfter("\"error\":").substringAfter("\"").substringBefore("\"") 
+                            }
+                            // Check for general error message
+                            errorBody.contains("\"general\":") -> {
+                                errorBody.substringAfter("\"general\":").substringAfter("\"").substringBefore("\"") 
+                            }
+                            // If we can't parse the error, use the status code
+                            else -> "Error: ${response.code()} ${response.message()}"
+                        }
+                    } else {
+                        "Error: ${response.code()} ${response.message()}"
+                    }
+                } catch (e: Exception) {
+                    Log.e("AuthViewModel", "Error parsing error body", e)
+                    "An error occurred during login: ${response.code()}"
+                }
             }
         }
     }
@@ -272,6 +394,9 @@ class AuthViewModel @Inject constructor(
                     
                     Log.d("AuthViewModel", "Registration response user: $userData")
                     Log.d("AuthViewModel", "JWT Token received: ${token != null}")
+                    if (userData != null) {
+                        Log.d("AuthViewModel", "User avatarUrl: ${userData.avatarUrl}, fullName: ${userData.fullName}")
+                    }
                     
                     // Mark as registered and logged in if we have a token
                     if (token != null) {
@@ -289,6 +414,8 @@ class AuthViewModel @Inject constructor(
                         
                         // Emit success event through AuthManager
                         viewModelScope.launch {
+                            // Add delay to ensure snackbar messages are visible
+                            delay(200)
                             authManager.emitAuthEvent(Success("Registered successfully"))
                         }
                         // Add delay before navigation
@@ -299,26 +426,77 @@ class AuthViewModel @Inject constructor(
                         _authError.value = "Authentication error: No token received"
                         _userState.value = UserState.Error("Authentication error: No token received")
                         viewModelScope.launch {
+                            delay(200) // Ensure message visibility
                             authManager.emitAuthEvent(Failure("Authentication error: No token received"))
                         }
                     }
                 } else {
-                    val errorMsg = response.body()?.message ?: "Registration failed: ${response.code()}"
+                    // Handle different error cases based on response status and body
+                    val errorMsg = formatRegistrationError(response)
                     _authError.value = errorMsg
                     _userState.value = UserState.Error(errorMsg)
                     viewModelScope.launch {
+                        delay(200) // Ensure message visibility
                         authManager.emitAuthEvent(Failure(errorMsg))
+                    }
+                    
+                    // Handle unauthorized errors
+                    if (response.code() == 401) {
+                        handleUnauthorized()
                     }
                 }
             } catch (e: Exception) {
-                val errorMsg = "Registration error: ${e.message}"
+                Log.e("AuthViewModel", "Registration error: ", e)
+                val errorMsg = "Registration error: ${e.message ?: "Unknown error occurred"}"
                 _authError.value = errorMsg
                 _userState.value = UserState.Error(errorMsg)
                 viewModelScope.launch {
+                    delay(200) // Ensure message visibility
                     authManager.emitAuthEvent(Failure(errorMsg))
                 }
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+    
+    /**
+     * Format registration error messages based on response status and body
+     */
+    private fun formatRegistrationError(response: retrofit2.Response<*>): String {
+        return when (response.code()) {
+            400 -> "Invalid registration data. Please check your inputs."
+            401 -> "Authentication required."
+            409 -> "Email already in use. Please use a different email or try logging in."
+            else -> {
+                try {
+                    val errorBody = response.errorBody()?.string()
+                    Log.d("AuthViewModel", "Registration error body: $errorBody")
+                    
+                    if (errorBody != null) {
+                        when {
+                            // Check for message in error body
+                            errorBody.contains("\"message\":") -> {
+                                errorBody.substringAfter("\"message\":").substringAfter("\"").substringBefore("\"") 
+                            }
+                            // Check for error in error body
+                            errorBody.contains("\"error\":") -> {
+                                errorBody.substringAfter("\"error\":").substringAfter("\"").substringBefore("\"") 
+                            }
+                            // Check for general error message
+                            errorBody.contains("\"general\":") -> {
+                                errorBody.substringAfter("\"general\":").substringAfter("\"").substringBefore("\"") 
+                            }
+                            // If we can't parse the error, use the status code
+                            else -> "Registration failed: ${response.code()} ${response.message()}"
+                        }
+                    } else {
+                        "Registration failed: ${response.code()} ${response.message()}"
+                    }
+                } catch (e: Exception) {
+                    Log.e("AuthViewModel", "Error parsing registration error body", e)
+                    "An error occurred during registration: ${response.code()}"
+                }
             }
         }
     }

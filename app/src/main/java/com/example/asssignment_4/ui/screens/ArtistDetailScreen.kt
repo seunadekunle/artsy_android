@@ -119,7 +119,17 @@ fun ArtistDetailScreen(
     val currentUser = authViewModel.currentUser.collectAsState().value
     val isLoggedIn = authViewModel.isLoggedIn.collectAsState().value
     val favouriteIds = viewModel.favouriteIds.collectAsState().value
-    val isFavorite = artist?.id?.let { favouriteIds.contains(it) } ?: false
+    
+    // Track favorite status with both state collection and local state to ensure UI updates
+    var isFavorite by remember { mutableStateOf(false) }
+    
+    // Update local favorite state whenever artist or favorite IDs change
+    LaunchedEffect(artist?.id, favouriteIds) {
+        val newFavoriteStatus = artist?.id?.let { favouriteIds.contains(it) } ?: false
+        Log.d("ArtistDetailScreen", "Favorite status updated: ${artist?.id} - $newFavoriteStatus")
+        isFavorite = newFavoriteStatus
+    }
+    
     val similarArtists = viewModel.similarArtists.collectAsState().value
 
     // Derive display values from the collected artist state

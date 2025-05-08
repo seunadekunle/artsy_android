@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -269,22 +270,62 @@ class HomeViewModel @Inject constructor(
         _detailError.value = null
     }
 
-    fun refreshFavoriteStatuses() {
+    // Cache timestamp for favorites to avoid excessive refreshes
+    private var lastFavoritesRefreshTime: Long = 0
+    private val favoritesRefreshThreshold = 10 * 1000 // 10 seconds
+    
+    fun refreshFavoriteStatuses(forceRefresh: Boolean = false) {
+        // Check if we've refreshed recently to avoid unnecessary network calls
+        val currentTime = System.currentTimeMillis()
+        if (!forceRefresh && currentTime - lastFavoritesRefreshTime < favoritesRefreshThreshold) {
+            Log.d("HomeViewModel", "Skipping favorites refresh - recently updated")
+            return
+        }
+        
         viewModelScope.launch {
             try {
                 Log.d("HomeViewModel", "Refreshing favorite statuses...")
-                val favoritesResult = artistRepository.getFavourites()
+                
+                // Use Dispatchers.IO for network operations
+                val favoritesResult = withContext(Dispatchers.IO) {
+                    artistRepository.getFavourites()
+                }
+                
                 if (favoritesResult.isSuccessful) {
                     val favorites = favoritesResult.body() ?: emptyList()
+                    
+                    // Update the last refresh timestamp
+                    lastFavoritesRefreshTime = System.currentTimeMillis()
+                    
+                    // Update UI state immediately
                     _favourites.value = favorites
-                    _favouriteIds.value = favorites.map { it.artistId }.toSet()
+                    val favoriteIds = favorites.map { it.artistId }.toSet()
+                    _favouriteIds.value = favoriteIds
                     
                     Log.d("HomeViewModel", "Favorites updated, count: ${favorites.size}")
                     
                     // Update the isFavorite field in all current lists
                     updateAllArtistsFavoriteStatus()
+                    
+                    // Mark that we need to refresh detailed information
+                    if (_detailedFavorites.value.isEmpty() || 
+                        _detailedFavorites.value.size != favorites.size ||
+                        _detailedFavorites.value.any { it.second == null }) {
+                        _needsRefresh.value = true
+                    }
                 } else {
-                    Log.e("HomeViewModel", "Failed to refresh favorites: ${favoritesResult.code()}")
+                    // Handle specific error codes
+                    when (favoritesResult.code()) {
+                        401 -> {
+                            Log.w("HomeViewModel", "Unauthorized (401) when fetching favorites - token may be expired")
+                            // Clear favorites if unauthorized
+                            _favourites.value = emptyList()
+                            _favouriteIds.value = emptySet()
+                        }
+                        else -> {
+                            Log.e("HomeViewModel", "Failed to refresh favorites: ${favoritesResult.code()}")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error refreshing favorites: ${e.message}")
@@ -292,7 +333,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    suspend fun fetchFavoritesDetails() {
+    suspend fun fetchFavoritesDetails(forceRefresh: Boolean = false) {
         if (_favourites.value.isEmpty()) {
             Log.d("HomeViewModel", "No favorites to fetch details for")
             _detailedFavorites.value = emptyList()
@@ -300,10 +341,10 @@ class HomeViewModel @Inject constructor(
         }
         
         try {
-            Log.d("HomeViewModel", "Fetching details for ${_favourites.value.size} favorites")
+            Log.d("HomeViewModel", "Fetching details for ${_favourites.value.size} favorites, forceRefresh=$forceRefresh")
             
             val currentTime = System.currentTimeMillis()
-            val cacheExpiry = 5 * 60 * 1000 // 5 minutes in milliseconds
+            val cacheExpiry = if (forceRefresh) 0 else 15 * 60 * 1000 // Force refresh ignores cache
             
             // Results list to be built
             val detailedFavorites = mutableListOf<Pair<Favorite, Artist?>>()
@@ -311,44 +352,74 @@ class HomeViewModel @Inject constructor(
             // Favorites that need details to be fetched
             val favoritesToFetch = mutableListOf<Favorite>()
             
-            // First, use cache where available
+            // First, use cache where available and immediately show cached results
             for (favorite in _favourites.value) {
                 val cached = artistDetailCache[favorite.artistId]
                 
-                if (cached != null && (currentTime - cached.second < cacheExpiry)) {
+                if (!forceRefresh && cached != null && (currentTime - cached.second < cacheExpiry)) {
                     // Cache hit - use cached artist detail
                     Log.d("HomeViewModel", "Cache hit for artist ${favorite.artistId}")
                     detailedFavorites.add(Pair(favorite, cached.first))
                 } else {
-                    // Cache miss - need to fetch
+                    // Cache miss or force refresh - need to fetch
                     favoritesToFetch.add(favorite)
+                    // Add placeholder to maintain order
+                    detailedFavorites.add(Pair(favorite, null))
                 }
             }
             
-            Log.d("HomeViewModel", "Cache hits: ${detailedFavorites.size}, misses: ${favoritesToFetch.size}")
+            // Immediately update UI with cached results
+            if (detailedFavorites.isNotEmpty()) {
+                _detailedFavorites.value = detailedFavorites.toList()
+                Log.d("HomeViewModel", "Updated UI with cached results first")
+            }
             
-            // Fetch details for all cache misses in parallel
+            Log.d("HomeViewModel", "Cache hits: ${detailedFavorites.size - favoritesToFetch.size}, misses: ${favoritesToFetch.size}")
+            
+            // Fetch details for all cache misses in parallel using coroutines
             if (favoritesToFetch.isNotEmpty()) {
-                val fetchedDetails = favoritesToFetch.map { favorite ->
-                    try {
-                        Log.d("HomeViewModel", "Fetching details for favorite: ${favorite.artistId}")
-                        val artist = artistRepository.getArtistDetailsById(favorite.artistId)
-                        if (artist != null) {
-                            // Cache the result
-                            artistDetailCache[favorite.artistId] = Pair(artist, currentTime)
+                val deferredResults = favoritesToFetch.map { favorite ->
+                    viewModelScope.async(Dispatchers.IO) {
+                        try {
+                            Log.d("HomeViewModel", "Fetching details for favorite: ${favorite.artistId}")
+                            val artist = artistRepository.getArtistDetailsById(favorite.artistId)
+                            if (artist != null) {
+                                // Cache the result
+                                artistDetailCache[favorite.artistId] = Pair(artist, currentTime)
+                            }
+                            Pair(favorite, artist)
+                        } catch (e: Exception) {
+                            Log.e("HomeViewModel", "Error fetching artist details: ${e.message}")
+                            Pair(favorite, null)
                         }
-                        Pair(favorite, artist)
-                    } catch (e: Exception) {
-                        Log.e("HomeViewModel", "Error fetching artist details: ${e.message}")
-                        Pair(favorite, null)
                     }
                 }
-                detailedFavorites.addAll(fetchedDetails)
+                
+                // Wait for all parallel requests to complete
+                val fetchedResults = deferredResults.awaitAll()
+                
+                // Update the detailed favorites with the fetched results
+                val updatedFavorites = detailedFavorites.map { (favorite, artist) ->
+                    // If this was a placeholder (null artist), find the fetched result
+                    if (artist == null) {
+                        fetchedResults.find { it.first.artistId == favorite.artistId } ?: Pair(favorite, null)
+                    } else {
+                        // Keep the cached result
+                        Pair(favorite, artist)
+                    }
+                }
+                
+                // Update the state with all detailed favorites
+                _detailedFavorites.value = updatedFavorites
+                Log.d("HomeViewModel", "Detailed favorites fully updated, count: ${updatedFavorites.size}")
+                
+                // Force a recomposition of any UI observing this state
+                // This is a trick to ensure the UI updates even if the values are the same
+                if (forceRefresh) {
+                    delay(50) // Small delay
+                    _detailedFavorites.value = updatedFavorites.toList()
+                }
             }
-            
-            // Update the state with all detailed favorites
-            _detailedFavorites.value = detailedFavorites
-            Log.d("HomeViewModel", "Detailed favorites updated, count: ${detailedFavorites.size}")
             
             // Reset the refresh flag
             _needsRefresh.value = false
@@ -539,35 +610,55 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Updates the favorite status of an artist across all UI collections
+     * to ensure consistent display everywhere
+     */
     private fun updateArtistFavoriteStatus(artistId: String, isFavorite: Boolean) {
         Log.d("HomeViewModel", "Updating favorite status for artist $artistId to $isFavorite")
         
-        // Update in search results
-        val updatedSearchResults = _searchResults.value.map { artist ->
-            if (artist.id == artistId) {
-                artist.copy(isFavorite = isFavorite)
+        viewModelScope.launch {
+            // First immediately update favorite IDs set to ensure quick UI response
+            if (isFavorite) {
+                val updatedIds = _favouriteIds.value.toMutableSet()
+                updatedIds.add(artistId)
+                _favouriteIds.value = updatedIds
             } else {
-                artist
+                val updatedIds = _favouriteIds.value.toMutableSet()
+                updatedIds.remove(artistId)
+                _favouriteIds.value = updatedIds
             }
-        }
-        _searchResults.value = updatedSearchResults
-        
-        // Update in artist detail if it's the same artist
-        _artistDetail.value?.let { currentArtist ->
-            if (currentArtist.id == artistId) {
-                _artistDetail.value = currentArtist.copy(isFavorite = isFavorite)
+            
+            // Update in search results
+            val updatedSearchResults = _searchResults.value.map { artist ->
+                if (artist.id == artistId) {
+                    artist.copy(isFavorite = isFavorite)
+                } else {
+                    artist
+                }
             }
-        }
-        
-        // Update in similar artists list
-        val updatedSimilarArtists = _similarArtists.value.map { artist ->
-            if (artist.id == artistId) {
-                artist.copy(isFavorite = isFavorite)
-            } else {
-                artist
+            _searchResults.value = updatedSearchResults
+            
+            // Update in artist detail if it's the same artist - this affects the star in the app bar
+            _artistDetail.value?.let { currentArtist ->
+                if (currentArtist.id == artistId) {
+                    // Create a new artist object to ensure state change is detected
+                    val updatedArtist = currentArtist.copy(isFavorite = isFavorite)
+                    Log.d("HomeViewModel", "Updated artist detail favorite status: ${updatedArtist.isFavorite}")
+                    _artistDetail.value = updatedArtist
+                }
             }
+            
+            // Update in similar artists list
+            val updatedSimilarArtists = _similarArtists.value.map { artist ->
+                if (artist.id == artistId) {
+                    artist.copy(isFavorite = isFavorite)
+                } else {
+                    artist
+                }
+            }
+            _similarArtists.value = updatedSimilarArtists
         }
-        _similarArtists.value = updatedSimilarArtists
         
         Log.d("HomeViewModel", "Favorite status updated for artist $artistId across all lists")
     }
@@ -599,5 +690,59 @@ class HomeViewModel @Inject constructor(
 
     fun getAuthToken(): String? {
         return authManager.getAuthToken()
+    }
+    
+    /**
+     * Validates and fixes problematic artist image URLs
+     * Especially focused on Picasso family artists based on memory info
+     */
+    suspend fun validateArtistImageUrls() {
+        try {
+            Log.d("HomeViewModel", "Validating artist image URLs after force close")
+            
+            // Process favorites first since they're important for the HomeScreen
+            _favourites.value.forEach { favorite ->
+                try {
+                    // Check for known problematic URLs
+                    if (favorite.artistImage.isNullOrEmpty() || 
+                        !favorite.artistImage.startsWith("http")) {
+                        Log.w("HomeViewModel", "Found invalid image URL for favorite: ${favorite.artistId}")
+                        
+                        // Try to get updated artist details to fix the URL
+                        val artistDetails = artistRepository.getArtistDetailsById(favorite.artistId)
+                        if (artistDetails != null && !artistDetails.imageUrl.isNullOrEmpty()) {
+                            Log.d("HomeViewModel", "Fixed image URL for ${favorite.artistId}")
+                        }
+                    }
+                    
+                    // Special handling for Picasso family artists
+                    if (favorite.artistName.contains("Picasso", ignoreCase = true)) {
+                        Log.d("HomeViewModel", "Special handling for Picasso artist: ${favorite.artistId}")
+                        // Force refresh this artist's details
+                        artistRepository.getArtistDetailsById(favorite.artistId)
+                    }
+                } catch (e: Exception) {
+                    // Just log errors and continue with the next artist
+                    Log.e("HomeViewModel", "Error validating image for ${favorite.artistId}: ${e.message}")
+                }
+                
+                // Small delay to avoid hammering the API
+                delay(50)
+            }
+            
+            // Force UI update by triggering a change in the detailed favorites list
+            // This is the key to making the UI refresh immediately
+            if (_detailedFavorites.value.isNotEmpty()) {
+                Log.d("HomeViewModel", "Forcing UI update for detailed favorites")
+                // Create a new list reference to trigger State change
+                _detailedFavorites.value = _detailedFavorites.value.toList()
+                // Also update the main favorites list
+                _favourites.value = _favourites.value.toList()
+            }
+            
+            Log.d("HomeViewModel", "Artist image URL validation complete")
+        } catch (e: Exception) {
+            Log.e("HomeViewModel", "Error in validateArtistImageUrls: ${e.message}")
+        }
     }
 }

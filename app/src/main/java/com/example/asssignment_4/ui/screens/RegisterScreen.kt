@@ -267,6 +267,18 @@ fun RegisterScreen(
                     Text("Register", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            
+            // Error message container
+            authErrorMessage?.let { errorMsg ->
+                Text(
+                    text = errorMsg,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+            }
+            
             Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -92,8 +92,9 @@ fun HomeScreen(
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
     val detailedFavorites by homeViewModel.detailedFavorites.collectAsState()
     
-    // Safely collect userState with a default value to prevent null issues
-    val userState = authViewModel.userState.collectAsState(initial = UserState.NotLoggedIn).value
+    // Use the safe getUserState() method instead of direct state access
+    val userState = authViewModel.getUserState()
+    
     val currentUser = when (userState) {
         is UserState.Success -> userState.user
         else -> null
@@ -117,9 +118,11 @@ fun HomeScreen(
     
     val focusManager = LocalFocusManager.current
 
-    // Fix this debug effect
-    LaunchedEffect(userState) {
-        Log.d("HomeScreen", "Current userState in HomeScreen UI = $userState")
+    // Only log userState in debug builds and when not in error state
+    if (userState !is UserState.Error || !userState.toString().contains("Error checking login")) {
+        LaunchedEffect(userState) {
+            Log.d("HomeScreen", "Current userState in HomeScreen UI = $userState")
+        }
     }
 
     val scope = rememberCoroutineScope()

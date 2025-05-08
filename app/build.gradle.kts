@@ -108,6 +108,8 @@ dependencies {
     
     // Lifecycle Runtime Compose
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    // Lifecycle Process
+    implementation("androidx.lifecycle:lifecycle-process:2.8.4")
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     implementation(libs.okhttp)

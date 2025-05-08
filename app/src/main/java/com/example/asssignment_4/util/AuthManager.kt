@@ -2,6 +2,7 @@ package com.example.asssignment_4.util
 
 import android.util.Log
 import com.example.asssignment_4.model.User
+import com.example.asssignment_4.repository.AuthRepository
 import com.franmontiel.persistentcookiejar.PersistentCookieJar
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import retrofit2.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,7 +30,8 @@ sealed class AuthManagerEvent {
 @Singleton
 class AuthManager @Inject constructor(
     private val tokenManager: TokenManager,
-    private val cookieJar: PersistentCookieJar
+    private val cookieJar: PersistentCookieJar,
+    private val authRepository: AuthRepository
 ) {
     // Authentication state
     private val _isLoggedIn = MutableStateFlow(false)
@@ -44,6 +47,11 @@ class AuthManager @Inject constructor(
     // Flag to track if user has manually logged out
     private val _manuallyLoggedOut = MutableStateFlow(false)
     val manuallyLoggedOut: StateFlow<Boolean> = _manuallyLoggedOut.asStateFlow()
+    
+    // User profile cache
+    private var cachedUserProfile: User? = null
+    private var lastProfileFetchTime = 0L
+    private val PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes in milliseconds
     
     // Should be called on app start to initialize auth state from token
     init {
@@ -147,5 +155,106 @@ class AuthManager @Inject constructor(
      */
     fun getAuthToken(): String? {
         return tokenManager.getAuthToken()
+    }
+    
+    /**
+     * Check if the current token is still valid by making a lightweight API call
+     * Updates the logged in state based on the result
+     * 
+     * @return true if the token is valid, false otherwise
+     */
+    suspend fun checkTokenValidity(): Boolean {
+        val token = getAuthToken()
+        if (token == null) {
+            _isLoggedIn.value = false
+            return false
+        }
+        
+        try {
+            // Make a profile request to check token validity
+            val response = authRepository.getProfile()
+            if (response.isSuccessful && response.body() != null) {
+                // If successful, update cached profile
+                updateCachedProfile(response)
+                
+                // Ensure logged in state is correct
+                if (!_isLoggedIn.value) {
+                    _isLoggedIn.value = true
+                    Log.d("AuthManager", "Token check: Valid token, updating isLoggedIn to true")
+                }
+                return true
+            } else {
+                // If unauthorized, clear auth state
+                if (response.code() == 401) {
+                    Log.w("AuthManager", "Token check: Token is invalid (401)")
+                    handleUnauthorized()
+                } else {
+                    Log.w("AuthManager", "Token check: Server error ${response.code()}")
+                }
+                return false
+            }
+        } catch (e: Exception) {
+            // Network errors or other exceptions
+            Log.e("AuthManager", "Token check failed: ${e.message}")
+            // Don't automatically clear auth on network errors
+            return false
+        }
+    }
+    
+    /**
+     * Update the cached user profile from a successful API response
+     */
+    private fun updateCachedProfile(response: Response<User>) {
+        response.body()?.let { user ->
+            cachedUserProfile = user
+            lastProfileFetchTime = System.currentTimeMillis()
+            
+            // Log profile details for debugging image issues
+            Log.d("AuthManager", "Profile updated - fullName: ${user.fullName}, email: ${user.email}")
+            
+            // Based on memory, User model has @SerialName("profileImageUrl") annotation for avatarUrl
+            Log.d("AuthManager", "Profile image URL: ${user.avatarUrl ?: "null"}")
+            
+            // Check for missing profile image URL based on memory info
+            if (user.avatarUrl.isNullOrEmpty()) {
+                Log.w("AuthManager", "User profile has no image URL - may indicate serialization issue")
+            }
+        }
+    }
+    
+    /**
+     * Get the current user profile information
+     * Uses cached version if available and not expired
+     * 
+     * @return The User object or null if not logged in
+     */
+    suspend fun getCurrentUserProfile(): User? {
+        val token = getAuthToken() ?: return null
+        
+        // Return cached profile if it's fresh enough
+        val now = System.currentTimeMillis()
+        if (cachedUserProfile != null && now - lastProfileFetchTime < PROFILE_CACHE_TTL) {
+            Log.d("AuthManager", "Using cached profile (age: ${now - lastProfileFetchTime}ms)")
+            return cachedUserProfile
+        }
+        
+        // Otherwise fetch fresh profile
+        try {
+            val response = authRepository.getProfile()
+            if (response.isSuccessful && response.body() != null) {
+                updateCachedProfile(response)
+                return cachedUserProfile
+            } else {
+                Log.w("AuthManager", "Failed to get profile: ${response.code()}")
+                if (response.code() == 401) {
+                    handleUnauthorized()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AuthManager", "Error getting profile: ${e.message}")
+        }
+        
+        // Return cached profile as fallback even if outdated
+        return cachedUserProfile
     }
 }
