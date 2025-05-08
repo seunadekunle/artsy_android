@@ -122,7 +122,7 @@ fun SearchResultCard(
                     .fillMaxWidth()
                     .height(40.dp)
                     .align(Alignment.BottomCenter)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.75f))
                     .padding(start = 8.dp, end = 16.dp)
             ) {
                 Row(

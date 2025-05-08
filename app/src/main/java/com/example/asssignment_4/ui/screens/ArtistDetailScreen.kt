@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -36,28 +37,32 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import com.example.asssignment_4.R
-import com.example.asssignment_4.ui.theme.artsyBlue
-import com.example.asssignment_4.ui.theme.artsyDarkBlue
-import com.example.asssignment_4.viewmodel.HomeViewModel
-import com.example.asssignment_4.viewmodel.AuthViewModel
-import com.example.asssignment_4.model.Artist
-import com.example.asssignment_4.model.Artwork
-import com.example.asssignment_4.model.Gene
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import coil.request.ImageRequest
+import com.example.asssignment_4.R
+import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.model.Artwork
+import com.example.asssignment_4.model.Gene
 import com.example.asssignment_4.ui.components.CategoryDialog
 import com.example.asssignment_4.ui.components.SearchResultCard
 import com.example.asssignment_4.ui.navigation.Screen
+import com.example.asssignment_4.ui.theme.artsyBlue
+import com.example.asssignment_4.ui.theme.artsyDarkBlue
+import com.example.asssignment_4.util.AuthManagerEvent
+import com.example.asssignment_4.viewmodel.AuthViewModel
+import com.example.asssignment_4.viewmodel.HomeViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,15 +73,19 @@ fun ArtistDetailScreen(
     artistId: String,
     paddingValues: PaddingValues
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Effect for fetching artist data when screen is first displayed
     LaunchedEffect(artistId, authViewModel.currentUser.value) { // Keyed by currentUser to re-fetch on login/logout
         // Call the ViewModel function to fetch data
         if (artistId.isNotEmpty()) { // Ensure ID is valid before fetching
             viewModel.fetchArtistDetailsAndArtworks(artistId)
-            // Fetch similar artists if user is logged in
-            if (authViewModel.currentUser.value != null) {
-                viewModel.fetchSimilarArtists(artistId = artistId, authToken = null) // Pass null, rely on cookie jar
+            // Only fetch similar artists when logged in
+            if (authViewModel.isLoggedIn.value) {
+                // Get the auth token from AuthManager
+                val token = viewModel.getAuthToken()
+                viewModel.fetchSimilarArtists(artistId = artistId, authToken = token)
             }
         }
     }
@@ -127,7 +136,38 @@ fun ArtistDetailScreen(
     var showCategoryDialog by remember { mutableStateOf(false) }
     var selectedArtworkForDialog by remember { mutableStateOf<Artwork?>(null) }
 
+    // Observe Snackbar messages from HomeViewModel
+    LaunchedEffect(Unit) {
+        viewModel.snackbarMessage.collect {
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    message = it,
+                    duration = SnackbarDuration.Short
+                )
+            }
+        }
+    }
+
+    // Observe auth events for account deletion Snackbar
+    LaunchedEffect(Unit) {
+        authViewModel.authEvent.collect { event ->
+            if (event is AuthManagerEvent.Success && event.message.contains("Account deleted successfully", ignoreCase = true)) {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "Deleted user successfully",
+                        duration = SnackbarDuration.Short
+                    )
+                    // Optionally navigate away after account deletion
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -181,18 +221,20 @@ fun ArtistDetailScreen(
                 .padding(innerPadding) // Apply padding from THIS Scaffold
                 .background(artsyBlue.copy(alpha = 0.05f))
         ) {
-            // Define tab data with icons and titles (conditionally include Similar tab if logged in)
-            val tabs = if (isLoggedIn) {
-                listOf(
-                    TabItem("Details", Icons.Outlined.Info),
-                    TabItem("Artworks", Icons.Outlined.AccountBox),
-                    TabItem("Similar", Icons.Outlined.People)
-                )
-            } else {
-                listOf(
+            // Get login state and similar artists
+            val isLoggedIn = authViewModel.isLoggedIn.collectAsState().value
+            val similarArtists = viewModel.similarArtists.collectAsState().value
+            
+            // Define tabs based on login state and similar artists availability
+            val tabs = remember(artist, similarArtists, isLoggedIn) {
+                val baseTabs = mutableListOf(
                     TabItem("Details", Icons.Outlined.Info),
                     TabItem("Artworks", Icons.Outlined.AccountBox)
                 )
+                if (isLoggedIn) {
+                    baseTabs.add(TabItem("Similar", Icons.Outlined.People))
+                }
+                baseTabs
             }
             
             TabRow(
@@ -267,16 +309,18 @@ fun ArtistDetailScreen(
                                 )
                                 
                                 // Artist subtitle with special characters, increased font weight and larger size
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = artistSubtitle.replace(" • ", " \u2022 "),
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 18.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    textAlign = TextAlign.Center
-                                )
+                                if (artistSubtitle != "-") {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = artistSubtitle.replace(" • ", " \u2022 "),
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 18.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                                 
                                 // Artist biography from the mockup
                                 Spacer(Modifier.height(16.dp))
@@ -323,7 +367,7 @@ fun ArtistDetailScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
                             items(artworks) { artwork ->
                                 Card(
@@ -510,7 +554,7 @@ fun ArtistDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Button(
-                                    onClick = { /* Navigate to login */ },
+                                    onClick = { navController.navigate(Screen.Login.route) },
                                     colors = ButtonDefaults.buttonColors(containerColor = artsyBlue)
                                 ) {
                                     Text("Log In")

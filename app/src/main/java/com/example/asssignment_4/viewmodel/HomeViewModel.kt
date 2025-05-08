@@ -22,6 +22,13 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 import android.util.Log
 import com.example.asssignment_4.network.ApiService
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -76,6 +83,9 @@ class HomeViewModel @Inject constructor(
     // Similar Artists State
     private val _similarArtists = MutableStateFlow<List<Artist>>(emptyList())
     val similarArtists: StateFlow<List<Artist>> = _similarArtists.asStateFlow()
+
+    private val _snackbarMessage = MutableSharedFlow<String>()
+    val snackbarMessage = _snackbarMessage.asSharedFlow()
 
     fun fetchSimilarArtists(artistId: String, authToken: String?) {
         viewModelScope.launch {
@@ -176,7 +186,14 @@ class HomeViewModel @Inject constructor(
 
     fun setError(message: String) {
         _error.value = message
+    }
+    
+    /**
+     * Clears the search results and resets the search state
+     */
+    fun clearSearchResults() {
         _searchResults.value = emptyList()
+        _error.value = null
         _isLoading.value = false
     }
 
@@ -246,23 +263,39 @@ class HomeViewModel @Inject constructor(
     /**
      * Fetch detailed artist information for each favorite
      */
-    fun fetchFavoritesDetails() {
-        viewModelScope.launch {
-            Log.d("HomeViewModel", "Fetching detailed information for ${_favourites.value.size} favorites")
-            
-            val detailedFavorites = _favourites.value.map { favorite ->
-                // For each favorite, fetch full artist details
-                try {
-                    val artistDetails = artistRepository.getArtistDetailsById(favorite.artistId)
-                    Log.d("HomeViewModel", "Fetched details for ${favorite.artistName}: ${artistDetails?.nationality}, ${artistDetails?.birthday}")
-                    favorite to artistDetails
-                } catch (e: Exception) {
-                    Log.e("HomeViewModel", "Error fetching details for artist ${favorite.artistId}", e)
-                    favorite to null
+    private suspend fun fetchFavoritesDetails() {
+        try {
+            val favorites = _favourites.value
+            val detailedList = mutableListOf<Pair<Favorite, Artist?>>()
+
+            // Use async to fetch artist details in parallel
+            val deferredArtists = favorites.map { favorite ->
+                viewModelScope.async(Dispatchers.IO) {
+                    try {
+                        val response = artistRepository.getArtistById(favorite.artistId)
+                        if (response.isSuccessful) {
+                            val artist = response.body()
+                            if (artist != null) {
+                                artist.isFavorite = true
+                                Pair(favorite, artist)
+                            } else null
+                        } else {
+                            Log.e("HomeViewModel", "Error fetching artist details: ${response.code()}")
+                            null
+                        }
+                    } catch (e: Exception) {
+                        Log.e("HomeViewModel", "Error fetching artist: ${e.message}")
+                        null
+                    }
                 }
             }
-            
-            _detailedFavorites.value = detailedFavorites
+
+            // Await all results and filter out nulls
+            val results = deferredArtists.awaitAll().filterNotNull()
+            _detailedFavorites.value = results
+            Log.d("HomeViewModel", "Updated detailed favorites list with ${results.size} items")
+        } catch (e: Exception) {
+            Log.e("HomeViewModel", "Error fetching favorite details: ${e.message}")
         }
     }
     
@@ -344,6 +377,24 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+        
+        // Start periodic refresh of detailed favorites
+        startAutoRefreshDetailedFavorites()
+    }
+
+    fun startAutoRefreshDetailedFavorites() {
+        viewModelScope.launch {
+            if (authManager.isLoggedIn.value) {
+                // Run in a separate coroutine to avoid blocking UI
+                launch {
+                    try {
+                        fetchFavoritesDetails()
+                    } catch (e: Exception) {
+                        Log.e("HomeViewModel", "Error refreshing favorites: ${e.message}")
+                    }
+                }
+            }
+        }
     }
 
     fun getFavorites() {
@@ -401,6 +452,7 @@ class HomeViewModel @Inject constructor(
                         
                         // Mark that we need to refresh detailed information
                         markNeedsRefresh()
+                        _snackbarMessage.emit("Added to Favorites")
                     }
                 } else {
                     val statusCode = response.code()
@@ -442,6 +494,7 @@ class HomeViewModel @Inject constructor(
                     
                     // Mark that we need to refresh detailed information
                     markNeedsRefresh()
+                    _snackbarMessage.emit("Removed from Favorites")
                 } else {
                     val statusCode = response.code()
                     Log.e("HomeViewModel", "Failed to remove favorite: $statusCode")
@@ -527,5 +580,13 @@ class HomeViewModel @Inject constructor(
         _similarArtists.value = updatedSimilarArtists
         
         Log.d("HomeViewModel", "Favorite status updated for all artists")
+    }
+
+    /**
+     * Gets the current auth token
+     * @return The auth token or null if not authenticated
+     */
+    fun getAuthToken(): String? {
+        return authManager.getAuthToken()
     }
 }

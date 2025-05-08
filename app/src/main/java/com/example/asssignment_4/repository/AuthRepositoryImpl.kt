@@ -158,8 +158,43 @@ class AuthRepositoryImpl @Inject constructor(
         return apiService.logout()
     }
 
-    override suspend fun deleteAccount(): Response<Unit> {
-        return apiService.deleteAccount()
+    override suspend fun deleteAccount(): Response<AuthResponse> {
+        try {
+            // Get token from TokenManager
+            val token = tokenManager.getAuthToken()
+            android.util.Log.d("AuthRepositoryImpl", "Making API call to delete account, token available: ${token != null}")
+            
+            if (token == null) {
+                android.util.Log.e("AuthRepositoryImpl", "Cannot delete account: No auth token available")
+                return Response.error(401, okhttp3.ResponseBody.create(
+                    "text/plain".toMediaTypeOrNull(),
+                    "Authentication required"
+                ))
+            }
+            
+            // Call the delete account API
+            val response = apiService.deleteAccount()
+            android.util.Log.d("AuthRepositoryImpl", "Delete account response code: ${response.code()}")
+            
+            if (response.isSuccessful) {
+                // If deletion was successful, clear the auth token
+                tokenManager.clearAuthToken()
+                android.util.Log.d("AuthRepositoryImpl", "Account deleted successfully")
+            } else {
+                // Log the error
+                val errorBody = response.errorBody()?.string()
+                android.util.Log.e("AuthRepositoryImpl", "Failed to delete account: ${response.code()}, error: $errorBody")
+            }
+            
+            return response
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepositoryImpl", "Exception during account deletion: ${e.message}")
+            e.printStackTrace()
+            return Response.error(500, okhttp3.ResponseBody.create(
+                "text/plain".toMediaTypeOrNull(), 
+                "Error deleting account: ${e.message}"
+            ))
+        }
     }
     
     /**

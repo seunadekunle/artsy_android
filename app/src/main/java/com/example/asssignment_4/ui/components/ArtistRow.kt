@@ -20,12 +20,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.asssignment_4.model.Artist
+import com.example.asssignment_4.ui.components.TimeAgoText
 
 @Composable
 fun ArtistRow(
     artist: Artist,
     onClick: (Artist) -> Unit,
-    onFavoriteToggle: ((String, Boolean) -> Unit)? = null
+    onFavoriteToggle: ((String, Boolean) -> Unit)? = null,
+    timestamp: String? = null // Add timestamp parameter with default value null
 ) {
 
     val artistInfo = formatFavoriteArtistInfo(artist = artist)
@@ -55,12 +57,17 @@ fun ArtistRow(
 
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "34 seconds ago",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Normal
-            )
+            // Use TimeAgoText if timestamp is available, otherwise show a placeholder
+            if (timestamp != null) {
+                TimeAgoText(dateTime = timestamp, delayMillis = 1000)
+            } else {
+                Text(
+                    text = "Recently",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Normal
+                )
+            }
             Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 Icons.Filled.ChevronRight,
@@ -101,5 +108,6 @@ fun ArtistRowPreview() {
         artist = artist,
         onClick = {},
         onFavoriteToggle = { _, _ -> },
+        timestamp = "2025-05-07T12:00:00Z" // Add sample timestamp for preview
     )
 }

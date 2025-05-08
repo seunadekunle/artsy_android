@@ -72,9 +72,18 @@ fun SearchScreen(
     val favourites by homeViewModel.favourites.collectAsState()
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
     val needsRefresh by homeViewModel.needsRefresh.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     
     var isSearchVisible by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+    
+    // Collect snackbar messages
+    LaunchedEffect(Unit) {
+        homeViewModel.snackbarMessage.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     var searchTerm by rememberSaveable { mutableStateOf("") }
 
@@ -104,6 +113,7 @@ fun SearchScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
                 TopAppBar(
                     title = {
@@ -117,7 +127,11 @@ fun SearchScreen(
                                         value = searchTerm,
                                         onValueChange = {
                                             searchTerm = it
-                                            if (it.isNotEmpty()) { homeViewModel.setSearchTerm(it) }
+                                            if (it.isEmpty()) {
+                                                homeViewModel.clearSearchResults()
+                                            } else {
+                                                homeViewModel.setSearchTerm(it)
+                                            }
                                         },
                                         modifier = Modifier.fillMaxWidth().padding(start = 6.dp),
                                         singleLine = true,
@@ -129,7 +143,11 @@ fun SearchScreen(
                                     }
                                 }
 
-                                IconButton(onClick = { homeViewModel.setSearchTerm(""); searchTerm = "" }) {
+                                IconButton(onClick = { 
+                                    searchTerm = ""
+                                    homeViewModel.clearSearchResults()
+                                    navController.navigateUp() 
+                                }) {
                                     Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = LocalContentColor.current.copy(alpha = 1f))
                                 }
                             }

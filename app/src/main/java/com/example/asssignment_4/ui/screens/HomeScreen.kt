@@ -254,7 +254,7 @@ fun HomeScreen(
                                             onDismissRequest = { showMenu = false }
                                         ) {
                                             DropdownMenuItem(
-                                                text = { Text("Logout", fontWeight = FontWeight.Medium) },
+                                                text = { Text("Log out", fontWeight = FontWeight.Medium) },
                                                 onClick = {
                                                     authViewModel.logoutUser()
                                                     showMenu = false
@@ -415,7 +415,8 @@ fun HomeScreen(
                                             // Mark that we need a refresh
                                             homeViewModel.markNeedsRefresh()
                                         }
-                                    }
+                                    },
+                                    timestamp = favorite.createdAt // Pass the timestamp from the favorite object
                                 )
                             }
                         }

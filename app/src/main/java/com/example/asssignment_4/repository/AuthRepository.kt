@@ -9,5 +9,5 @@ interface AuthRepository {
     suspend fun register(email: String, password: String, fullName: String): Response<AuthResponse>
     suspend fun getProfile(): Response<User>
     suspend fun logout(): Response<Unit>
-    suspend fun deleteAccount(): Response<Unit> // Added for account deletion
+    suspend fun deleteAccount(): Response<AuthResponse> // Updated for account deletion
 }

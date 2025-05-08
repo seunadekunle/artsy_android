@@ -360,29 +360,74 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Deletes the user's account using the /api/auth/account endpoint
+     * If successful, clears all auth state and redirects to login
+     */
     fun deleteAccount() {
         viewModelScope.launch {
             _isLoading.value = true
             _authError.value = null
             _userState.value = UserState.Loading
+            
             try {
+                Log.d("AuthViewModel", "Attempting to delete user account")
                 val response = authRepository.deleteAccount()
+                
                 if (response.isSuccessful) {
+                    val responseBody = response.body()
+                    Log.d("AuthViewModel", "Account deletion successful: ${responseBody?.message}")
+                    
+                    // Clear all user data and auth state
                     _currentUser.value = null
                     _userState.value = UserState.NotLoggedIn
                     authManager.clearAuthState() // Use AuthManager to clear session
+                    
+                    // Emit success event with message from server or default
+                    val successMsg = responseBody?.message ?: "Account deleted successfully"
                     viewModelScope.launch {
-                        authManager.emitAuthEvent(Success("Deleted user successfully"))
+                        delay(200) // Brief delay so UI can process the state change
+                        authManager.emitAuthEvent(Success(successMsg))
                     }
                 } else {
-                    val errorMsg = "Account deletion failed: ${response.code()} - ${response.message()}"
+                    // Handle error cases with different status codes
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("AuthViewModel", "Account deletion failed: ${response.code()} - $errorBody")
+                    
+                    // Try to parse the error response
+                    val errorMsg = when (response.code()) {
+                        401 -> "Authentication required. Please log in again."
+                        403 -> "Session expired. Please log in again."
+                        else -> {
+                            try {
+                                // Try to extract error message from response
+                                response.errorBody()?.string()?.let { 
+                                    if (it.contains("general")) {
+                                        // Extract the specific error message if possible
+                                        it.substringAfter("general\":").substringAfter("\"")
+                                          .substringBefore("\"").takeIf { it.isNotBlank() }
+                                    } else null
+                                } ?: "Account deletion failed: ${response.code()}"
+                            } catch (e: Exception) {
+                                "Account deletion failed: ${response.code()}"
+                            }
+                        }
+                    }
+                    
                     _authError.value = errorMsg
                     _userState.value = UserState.Error(errorMsg)
-                    viewModelScope.launch {
-                        authManager.emitAuthEvent(Failure(errorMsg))
+                    
+                    // If we got a 401/403, also handle the unauthorized state
+                    if (response.code() == 401 || response.code() == 403) {
+                        handleUnauthorized()
+                    } else {
+                        viewModelScope.launch {
+                            authManager.emitAuthEvent(Failure(errorMsg))
+                        }
                     }
                 }
             } catch (e: Exception) {
+                Log.e("AuthViewModel", "Exception during account deletion", e)
                 val errorMsg = "Error deleting account: ${e.message}"
                 _authError.value = errorMsg
                 _userState.value = UserState.Error(errorMsg)

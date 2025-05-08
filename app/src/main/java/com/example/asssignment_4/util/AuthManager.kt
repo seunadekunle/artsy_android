@@ -106,4 +106,12 @@ class AuthManager @Inject constructor(
     suspend fun emitAuthEvent(event: AuthManagerEvent) {
         _authEvent.emit(event)
     }
+
+    /**
+     * Get the current auth token
+     * @return The JWT token string, or null if not authenticated
+     */
+    fun getAuthToken(): String? {
+        return tokenManager.getAuthToken()
+    }
 }

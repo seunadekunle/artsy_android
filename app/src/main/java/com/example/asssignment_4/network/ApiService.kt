@@ -25,8 +25,8 @@ interface ApiService {
     @POST("/api/auth/logout")
     suspend fun logout(): Response<Unit>
 
-    @DELETE("/api/auth/me")
-    suspend fun deleteAccount(): Response<Unit>
+    @DELETE("/api/auth/account")
+    suspend fun deleteAccount(): Response<AuthResponse>
 
     // Search
     @GET("/api/artists/search")
