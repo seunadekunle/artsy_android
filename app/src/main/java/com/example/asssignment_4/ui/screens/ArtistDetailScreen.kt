@@ -263,13 +263,21 @@ fun ArtistDetailScreen(
                     if (isLoggedIn && artist != null) {
                         IconButton(
                             onClick = {
+                                Log.d("ArtistDetailScreen", "Favorite button clicked. Current status: $isFavorite")
                                 if (isFavorite) {
+                                    Log.d("ArtistDetailScreen", "Removing favorite: ${artist.id}")
                                     viewModel.removeFavorite(artist.id)
                                 } else {
+                                    Log.d("ArtistDetailScreen", "Adding favorite: ${artist.id}")
                                     viewModel.addFavorite(artist.id)
                                 }
+                                // Force immediate UI update after click
+                                Log.d("ArtistDetailScreen", "Forcing refresh of favorite statuses")
+                                viewModel.refreshFavoriteStatuses(true)
                             }
                         ) {
+                            // Debug current status
+                            Log.d("ArtistDetailScreen", "Rendering star with isFavorite=$isFavorite for ${artist.id}")
                             Icon(
                                 imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                 contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
