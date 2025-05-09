@@ -663,8 +663,8 @@ class HomeViewModel @Inject constructor(
                 // Update UI again after network operations
                 if (didNetworkOperations) {
                     updateAllArtistsFavoriteStatus()
-                    // Only show snackbar if we actually did network operations
-                    _snackbarMessage.emit("Favorites updated")
+                    // We don't emit a snackbar message here since this is just a background sync
+                    // Snackbars should only be shown for explicit user actions like adding/removing favorites
                 }
                 
                 Log.d("HomeViewModel", "Fast favorites sync complete")
