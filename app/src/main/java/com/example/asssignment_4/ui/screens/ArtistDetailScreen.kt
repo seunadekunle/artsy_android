@@ -178,7 +178,24 @@ fun ArtistDetailScreen(
 
     // Derive display values from the collected artist state
     val artistSubtitle = formatArtistInfo(artist = artist)
-    val artistBio = artist?.biography ?: ""
+    
+    // Normalize biography text to remove extra spaces
+    val artistBio = artist?.biography?.let { bio ->
+        bio.split("\n").joinToString("\n") { paragraph ->
+            paragraph.replace(Regex("\\s+"), " ")
+                .replace(Regex("\\s+([.,;:!?])"), "$1")
+                .replace(Regex("([.,;:!?])(?!\\s|$)"), "$1 ")
+                .trim()
+        }.let { sanitized ->
+            // Check for and handle any potential encoding issues
+            try {
+                String(sanitized.toByteArray(Charsets.UTF_8), Charsets.UTF_8)
+            } catch (e: CharacterCodingException) {
+                Log.w("ArtistDetailScreen", "Encoding issue detected in artist bio", e)
+                sanitized // Fallback to original if encoding fails
+            }
+        }
+    } ?: ""
 
     LaunchedEffect(artistId, selectedTab, isLoggedIn) { // Removed tokenValue from key
         if (isLoggedIn && selectedTab == 3) { // Similar tab
@@ -429,7 +446,9 @@ fun ArtistDetailScreen(
                                         .fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp),
                                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.onSecondary)
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    )
                                 ) {
                                     Column { // Revert: Let Column naturally wrap content
                                         // Display artwork image if available

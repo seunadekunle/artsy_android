@@ -1,6 +1,7 @@
 package com.example.asssignment_4.ui.components
 
 import android.util.Log
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +59,28 @@ import com.example.asssignment_4.R
 import com.example.asssignment_4.model.Gene
 import kotlinx.coroutines.launch
 
+/**
+ * Sanitizes a gene description by cleaning up markdown-style links.
+ * Extracts text within brackets and removes the URL parts.
+ * Example: "[El Greco](/artist/el-greco-domenikos-theotokopoulos)" becomes "El Greco"
+ */
+private fun sanitizeGeneDescription(description: String?): String {
+    if (description == null) return "No description available."
+    
+    // Replace markdown links with just the text inside brackets
+    val sanitized = description.replace(Regex("\\[([^\\]]+)\\]\\([^\\)]+\\)"), "$1")
+        // Replace multiple spaces with a single space
+        .replace(Regex("\\s+"), " ")
+        // Remove spaces before punctuation
+        .replace(Regex("\\s+([.,;:!?])"), "$1")
+        // Ensure proper spacing after punctuation
+        .replace(Regex("([.,;:!?])(?!\\s|$)"), "$1 ")
+        // Trim leading/trailing spaces
+        .trim()
+    
+    return sanitized
+}
+
 @Composable
 fun CategoryDialog(
     categories: List<Gene>,
@@ -69,10 +93,16 @@ fun CategoryDialog(
     val coroutineScope = rememberCoroutineScope()
     var currentIndex by remember { mutableStateOf(0) }
 
+    val isDark = isSystemInDarkTheme()
+    val surface = MaterialTheme.colorScheme.surface
+
+    val lowLift  = lerp(surface, if (isDark) Color.White else Color.Black, 0.06f)
+    val highLift = lerp(surface, if (isDark) Color.White else Color.Black, 0.11f)
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            color = lowLift,
             modifier = Modifier
                 .fillMaxWidth(1f)
                 .heightIn(min = 550.dp, max = 595.dp)
@@ -149,7 +179,7 @@ fun CategoryDialog(
                                                 .fillParentMaxHeight(0.95f)
                                                 .width(240.dp),
                                             shape = RoundedCornerShape(12.dp),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                            colors = CardDefaults.cardColors(containerColor = highLift)
                                         ) {
                                             Column(
                                                 modifier = Modifier.fillMaxSize(),
@@ -187,7 +217,7 @@ fun CategoryDialog(
                                                     horizontalAlignment = Alignment.Start
                                                 ) {
                                                     Text(
-                                                        text = gene.description ?: "No description available.",
+                                                        text = sanitizeGeneDescription(gene.description),
                                                         style = MaterialTheme.typography.bodyMedium,
                                                         color = MaterialTheme.colorScheme.onSurface,
                                                         fontWeight = FontWeight(499),
