@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -31,7 +32,8 @@ sealed class Screen(val route: String) {
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
-    paddingValues: PaddingValues
+    paddingValues: PaddingValues,
+    snackbarHostState: SnackbarHostState
 ) {
     val slideSpec = tween<IntOffset>(durationMillis = 300, easing = FastOutSlowInEasing)
     val fadeSpec = tween<Float>(durationMillis = 300)
@@ -68,7 +70,10 @@ fun AppNavGraph(
                 }
             }
         ) {
-            HomeScreen(navController = navController)
+            HomeScreen(
+                navController = navController,
+                snackbarHostState = snackbarHostState
+            )
         }
 
         // SEARCH SCREEN
@@ -102,7 +107,10 @@ fun AppNavGraph(
                 }
             }
         ) {
-            SearchScreen(navController = navController)
+            SearchScreen(
+                navController = navController,
+                snackbarHostState = snackbarHostState
+            )
         }
 
         // ARTIST DETAIL SCREEN
@@ -120,7 +128,8 @@ fun AppNavGraph(
             ArtistDetailScreen(
                 navController = navController,
                 artistId = artistId,
-                paddingValues = paddingValues
+                paddingValues = paddingValues,
+                snackbarHostState = snackbarHostState
             )
         }
 
@@ -134,6 +143,7 @@ fun AppNavGraph(
         ) {
             LoginScreen(
                 navController = navController,
+                snackbarHostState = snackbarHostState,
                 onRegister = { navController.navigate(Screen.Register.route) },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
@@ -154,6 +164,7 @@ fun AppNavGraph(
         ) {
             RegisterScreen(
                 navController = navController,
+                snackbarHostState = snackbarHostState,
                 onLogin = { navController.navigate(Screen.Login.route) },
                 onRegisterSuccess = {
                     navController.navigate(Screen.Home.route) {

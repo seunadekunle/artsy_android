@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +40,7 @@ import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -114,6 +118,16 @@ class MainActivity : ComponentActivity() {
             YourAppTheme {
                 val navController = rememberNavController()
                 
+                // Create a global SnackbarHostState that will be shared across all screens
+                val snackbarHostState = remember { SnackbarHostState() }
+                
+                // Collect global snackbar messages
+                LaunchedEffect(Unit) {
+                    HomeViewModel.globalSnackbarMessage.collect { message ->
+                        snackbarHostState.showSnackbar(message)
+                    }
+                }
+                
                 // Global loading state for tracking data refresh
                 val isLoading = remember { isInitialLoading }
                 
@@ -133,15 +147,6 @@ class MainActivity : ComponentActivity() {
                 }
                 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Main app content
-                    Surface(color = MaterialTheme.colorScheme.background) {
-                        AppNavGraph(
-                            navController = navController,
-                            paddingValues = PaddingValues(0.dp)
-                        )
-                    }
-                    
-                    // Loading overlay that appears during initial load
                     AnimatedVisibility(
                         visible = isLoading.value,
                         enter = fadeIn(),
@@ -162,6 +167,20 @@ class MainActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                             }
+                        }
+                    }
+                    
+                    // Main app content with global Scaffold and SnackbarHost
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        snackbarHost = { SnackbarHost(snackbarHostState) }
+                    ) { innerPadding ->
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            AppNavGraph(
+                                navController = navController,
+                                paddingValues = innerPadding,
+                                snackbarHostState = snackbarHostState
+                            )
                         }
                     }
                 }

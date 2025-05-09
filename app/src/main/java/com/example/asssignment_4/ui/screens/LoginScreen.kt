@@ -33,12 +33,14 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     navController: NavHostController,
     authViewModel: AuthViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState,
     onRegister: () -> Unit = {},
     onLoginSuccess: () -> Unit = {}
 ) {
@@ -51,7 +53,6 @@ fun LoginScreen(
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
     val authErrorMessage by authViewModel.authError.collectAsStateWithLifecycle()
 
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -247,13 +248,16 @@ fun LoginScreen(
                 Text(
                     "Don't have an account yet? ",
                     maxLines = 1,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = (-0.05).sp,
                 )
                 Text(
                     "Register",
                     color = lightArtsyDarkBlue,
-                    fontWeight = FontWeight.Normal,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
+                    letterSpacing = (-0.05).sp,
                     modifier = Modifier.clickable { onRegister() }
                 )
             }
@@ -266,6 +270,7 @@ fun LoginScreen(
 fun LoginScreenPreview() {
     LoginScreen(
         navController = rememberNavController(),
+        snackbarHostState = remember { SnackbarHostState() },
         onRegister = {}
     )
 }

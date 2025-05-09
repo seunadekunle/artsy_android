@@ -83,7 +83,8 @@ import com.example.asssignment_4.viewmodel.UserState
 fun HomeScreen(
     navController: NavHostController,
     homeViewModel: HomeViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState
 ) {
 
     val isLoading by homeViewModel.isLoading.collectAsState()
@@ -126,7 +127,6 @@ fun HomeScreen(
     }
 
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // Collect auth events for snackbar messages
     LaunchedEffect(Unit) {
@@ -209,8 +209,7 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+    Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {

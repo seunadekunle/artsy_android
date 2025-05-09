@@ -72,9 +72,9 @@ fun ArtistDetailScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     artistId: String,
-    paddingValues: PaddingValues
+    paddingValues: PaddingValues,
+    snackbarHostState: SnackbarHostState
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     // Effect for fetching artist data when screen is first displayed
@@ -685,6 +685,7 @@ fun ArtistDetailScreenPreview() {
         navController = rememberNavController(),
         artistId = "123",
         paddingValues = PaddingValues(0.dp), // Provide dummy padding
+        snackbarHostState = remember { SnackbarHostState() },
         authViewModel = hiltViewModel() // Will be replaced with a preview mock in non-Hilt preview
     )
 }

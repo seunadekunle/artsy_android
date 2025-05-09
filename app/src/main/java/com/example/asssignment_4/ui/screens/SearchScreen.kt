@@ -18,8 +18,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -39,12 +41,14 @@ import com.example.asssignment_4.ui.navigation.Screen
 import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
 import com.example.asssignment_4.viewmodel.UserState
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     navController: NavHostController,
-    homeViewModel: HomeViewModel = hiltViewModel()
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    snackbarHostState: SnackbarHostState
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
     
@@ -72,11 +76,12 @@ fun SearchScreen(
     val favourites by homeViewModel.favourites.collectAsState()
     val favouriteIds by homeViewModel.favouriteIds.collectAsState()
     val needsRefresh by homeViewModel.needsRefresh.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     
+    // State for search visibility and focus management
     var isSearchVisible by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     
     // Collect snackbar messages
     LaunchedEffect(Unit) {
@@ -88,6 +93,17 @@ fun SearchScreen(
     var searchTerm by rememberSaveable { mutableStateOf("") }
 
 
+    // Handle both automatic focus on navigation and manual focus changes
+    LaunchedEffect(Unit) {
+        // Set search as visible when screen is displayed
+        isSearchVisible = true
+        // Small delay to ensure the UI is fully composed
+        delay(100)
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
+    
+    // Also handle focus requests from isSearchVisible changes (for backward compatibility)
     LaunchedEffect(isSearchVisible) {
         if (isSearchVisible) {
             focusRequester.requestFocus()
@@ -123,7 +139,6 @@ fun SearchScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
                 TopAppBar(
                     title = {
@@ -143,7 +158,10 @@ fun SearchScreen(
                                                 homeViewModel.setSearchTerm(it)
                                             }
                                         },
-                                        modifier = Modifier.fillMaxWidth().padding(start = 6.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 6.dp)
+                                            .focusRequester(focusRequester),
                                         singleLine = true,
                                         textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.W500, textDecoration = TextDecoration.Underline, color = LocalContentColor.current),
                                         cursorBrush = SolidColor(LocalContentColor.current)
@@ -203,5 +221,8 @@ fun SearchScreen(
 @Preview(showBackground = true)
 @Composable
 fun SearchScreenPreview() {
-    SearchScreen(navController = rememberNavController())
+    SearchScreen(
+        navController = rememberNavController(),
+        snackbarHostState = remember { SnackbarHostState() }
+    )
 }

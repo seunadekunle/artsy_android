@@ -38,6 +38,17 @@ class HomeViewModel @Inject constructor(
     private val apiService: ApiService
 ) : ViewModel() {
 
+    companion object {
+        // Global snackbar message flow that can be observed from anywhere in the app
+        private val _globalSnackbarMessage = MutableSharedFlow<String>()
+        val globalSnackbarMessage = _globalSnackbarMessage.asSharedFlow()
+        
+        // Function to emit a snackbar message from anywhere in the app
+        suspend fun showSnackbar(message: String) {
+            _globalSnackbarMessage.emit(message)
+        }
+    }
+
     private val artistDetailCache = mutableMapOf<String, Pair<Artist, Long>>()
 
     private val _searchTerm = MutableStateFlow("")
@@ -87,8 +98,16 @@ class HomeViewModel @Inject constructor(
     private val _similarArtists = MutableStateFlow<List<Artist>>(emptyList())
     val similarArtists: StateFlow<List<Artist>> = _similarArtists.asStateFlow()
 
+    // Local snackbar message flow for backward compatibility
     private val _snackbarMessage = MutableSharedFlow<String>()
     val snackbarMessage = _snackbarMessage.asSharedFlow()
+    
+    // Forward local snackbar messages to the global flow
+    private suspend fun showSnackbar(message: String) {
+        _snackbarMessage.emit(message)
+        // Also emit to global flow
+        _globalSnackbarMessage.emit(message)
+    }
 
     // For artwork categories (genes)
     private val _artworkCategories = MutableStateFlow<Map<String, List<Gene>>>(emptyMap())
@@ -558,7 +577,7 @@ class HomeViewModel @Inject constructor(
 
                         // Mark that we need to refresh detailed information
                         markNeedsRefresh()
-                        _snackbarMessage.emit("Added to Favorites")
+                        showSnackbar("Added to Favorites")
 
                         // Fetch and cache artist detail in the background
                         viewModelScope.launch(Dispatchers.IO) {
@@ -605,7 +624,7 @@ class HomeViewModel @Inject constructor(
                     
                     // Mark that we need to refresh detailed information
                     markNeedsRefresh()
-                    _snackbarMessage.emit("Removed from Favorites")
+                    showSnackbar("Removed from Favorites")
                 } else {
                     val statusCode = response.code()
                     Log.e("HomeViewModel", "Failed to remove favorite: $statusCode")
@@ -670,7 +689,7 @@ class HomeViewModel @Inject constructor(
                 Log.d("HomeViewModel", "Fast favorites sync complete")
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error synchronizing favorites: ${e.message}")
-                _snackbarMessage.emit("Failed to sync favorites")
+                showSnackbar("Failed to sync favorites")
             }
         }
     }
