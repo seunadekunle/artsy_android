@@ -65,14 +65,10 @@ fun CategoryDialog(
 ) {
     Log.d("ArtistDetailScreen", "CategoryDialog: isLoading=$isLoading, categories=${categories.size}")
 
-    // State for LazyRow
     val lazyListState = rememberLazyListState()
-    // Coroutine scope for scrolling
     val coroutineScope = rememberCoroutineScope()
-    // Track current visible index
     var currentIndex by remember { mutableStateOf(0) }
 
-    // Main Dialog shell
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
@@ -99,7 +95,6 @@ fun CategoryDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Content Area with LazyRow
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     when {
                         isLoading -> {
@@ -121,23 +116,16 @@ fun CategoryDialog(
                             }
                         }
                         else -> {
-                            val showPrevious = currentIndex > 0
-                            val showNext = currentIndex < categories.size - 1
-
-                            val navigateToPrevious = {
-                                if (showPrevious) {
-                                    currentIndex--
-                                    coroutineScope.launch {
-                                        lazyListState.animateScrollToItem(currentIndex)
-                                    }
+                            val navigateToPrevious: () -> Unit = {
+                                currentIndex = if (currentIndex > 0) currentIndex - 1 else categories.size - 1
+                                coroutineScope.launch {
+                                    lazyListState.animateScrollToItem(currentIndex)
                                 }
                             }
-                            val navigateToNext = {
-                                if (showNext) {
-                                    currentIndex++
-                                    coroutineScope.launch {
-                                        lazyListState.animateScrollToItem(currentIndex)
-                                    }
+                            val navigateToNext: () -> Unit = {
+                                currentIndex = if (currentIndex < categories.size - 1) currentIndex + 1 else 0
+                                coroutineScope.launch {
+                                    lazyListState.animateScrollToItem(currentIndex)
                                 }
                             }
 
@@ -248,7 +236,6 @@ fun CategoryDialog(
                     }
                 }
 
-                // Footer with Close Button
                 Spacer(Modifier.height(5.dp))
 
                 Row (modifier = Modifier
