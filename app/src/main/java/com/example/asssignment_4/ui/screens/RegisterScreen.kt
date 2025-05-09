@@ -170,6 +170,8 @@ fun RegisterScreen(
                     text = nameError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 16.sp,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -201,6 +203,8 @@ fun RegisterScreen(
                     text = emailError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 16.sp,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -233,6 +237,8 @@ fun RegisterScreen(
                     text = passwordError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 16.sp,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }

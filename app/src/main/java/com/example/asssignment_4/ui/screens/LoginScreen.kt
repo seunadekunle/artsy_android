@@ -164,6 +164,8 @@ fun LoginScreen(
                     text = emailError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 16.sp,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -196,6 +198,8 @@ fun LoginScreen(
                     text = passwordError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 16.sp,
                     modifier = Modifier.align(Alignment.Start)
                 )
             }
@@ -255,7 +259,7 @@ fun LoginScreen(
                 Text(
                     "Register",
                     color = lightArtsyDarkBlue,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Normal,
                     maxLines = 1,
                     letterSpacing = (-0.05).sp,
                     modifier = Modifier.clickable { onRegister() }
