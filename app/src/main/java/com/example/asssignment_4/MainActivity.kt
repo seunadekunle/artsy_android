@@ -40,7 +40,6 @@ import com.example.asssignment_4.viewmodel.AuthViewModel
 import com.example.asssignment_4.viewmodel.HomeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -99,6 +98,13 @@ class MainActivity : ComponentActivity() {
         
         // Create a state to track initial loading for overlay
         val isInitialLoading = mutableStateOf(true)
+        
+        // Handle configuration changes (like theme changes)
+        if (savedInstanceState != null) {
+            Log.d(TAG, "Configuration change detected - preserving state")
+            // No need to refresh data on configuration changes
+            isInitialLoading.value = false
+        }
         
         // Force data refresh kicks off initial loading
         if (isColdStart.value || wasForceClose.value) {
