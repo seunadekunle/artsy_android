@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
@@ -148,24 +150,39 @@ fun SearchScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
 
                                 Box(modifier = Modifier.weight(1f)) {
-                                    BasicTextField(
-                                        value = searchTerm,
-                                        onValueChange = {
-                                            searchTerm = it
-                                            if (it.isEmpty()) {
-                                                homeViewModel.clearSearchResults()
-                                            } else {
-                                                homeViewModel.setSearchTerm(it)
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 6.dp)
-                                            .focusRequester(focusRequester),
-                                        singleLine = true,
-                                        textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.W500, textDecoration = TextDecoration.Underline, color = LocalContentColor.current),
-                                        cursorBrush = SolidColor(LocalContentColor.current)
+                                    val secondary = MaterialTheme.colorScheme.secondary
+                                    val selectionColors = TextSelectionColors(
+                                        handleColor     = secondary,
+                                        backgroundColor = secondary.copy(alpha = 0.4f)
                                     )
+
+                                    CompositionLocalProvider(
+                                        LocalTextSelectionColors provides selectionColors
+                                    ) {
+                                        BasicTextField(
+                                            value = searchTerm,
+                                            onValueChange =  {
+                                                searchTerm = it
+                                                if (it.isEmpty()) {
+                                                    homeViewModel.clearSearchResults()
+                                                } else {
+                                                    homeViewModel.setSearchTerm(it)
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 6.dp)
+                                                .focusRequester(focusRequester),
+                                            singleLine = true,
+                                            textStyle = LocalTextStyle.current.copy(
+                                                fontSize        = 22.sp,
+                                                fontWeight      = FontWeight.W500,
+                                                textDecoration  = TextDecoration.Underline,
+                                                color           = LocalContentColor.current
+                                            ),
+                                            cursorBrush = SolidColor(LocalContentColor.current)
+                                        )
+                                    }
                                     if (searchTerm.isEmpty()) {
                                         Text("Search artists…", fontSize = 22.sp, color = LocalContentColor.current.copy(alpha = 0.6f), modifier = Modifier.padding(start = 6.dp))
                                     }
