@@ -20,4 +20,4 @@ This Android application allows users to explore visual artists and their works 
 *   **Session Management:** `PersistentCookieJar`
 
 
-<video src="[https://github.com/user-attachments/assets/856fcb5d-0e53-4231-b5dc-75ae3e4e47f0](https://github.com/user-attachments/assets/ade19bba-3c79-4958-af7a-bd258320f0c6)" controls></video>
+<video src="https://github.com/user-attachments/assets/ade19bba-3c79-4958-af7a-bd258320f0c6" controls></video>
